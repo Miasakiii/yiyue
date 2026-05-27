@@ -1,0 +1,49 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "yiyue",
+  "version": "0.1.0",
+  "identifier": "com.asakii.yiyue",
+  "build": {
+    "beforeDevCommand": "pnpm dev",
+    "devUrl": "http://localhost:1420",
+    "beforeBuildCommand": "pnpm build",
+    "frontendDist": "../dist"
+  },
+  "app": {
+    "windows": [
+      {
+        "title": "一页",
+        "width": 1000,
+        "height": 700,
+        "minWidth": 600,
+        "minHeight": 400
+      }
+    ],
+    "security": {
+      "csp": null
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": ["nsis", "msi"],
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ],
+    "windows": {
+      "nsis": {
+        "displayLanguageSelector": true,
+        "installerIcon": "icons/icon.ico",
+        "languages": ["SimpChinese", "English"]
+      },
+      "wix": null
+    },
+    "category": "Productivity",
+    "shortDescription": "本地优先的桌面阅读器",
+    "longDescription": "一页是一款本地优先的桌面阅读器，支持 TXT、EPUB、PDF、Markdown、CBZ 等格式，提供舒适的阅读体验和笔记功能。",
+    "copyright": "© 2026 asakii"
+  }
+}

@@ -1,0 +1,46 @@
+# Dependencies
+node_modules/
+
+# Build outputs
+dist/
+src-tauri/target/
+
+# Planning documents
+PRD.md
+STATUS.md
+.ralph/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+npm-debug.log*
+pnpm-debug.log*
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Tauri
+src-tauri/*.exe
+src-tauri/*.msi
+src-tauri/*.dmg
+src-tauri/*.app
+src-tauri/*.deb
+src-tauri/*.AppImage
+
+# Rust
+**/*.rs.bk
+
+# Temporary
+*.tmp
+*.temp
