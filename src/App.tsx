@@ -14,9 +14,12 @@ function App() {
   const { currentBook, loadBooks, theme } = useAppStore();
   const [showSearch, setShowSearch] = useState(false);
   const [page, setPage] = useState<Page>("library");
+  const [initError, setInitError] = useState<string | null>(null);
 
   useEffect(() => {
-    loadBooks();
+    loadBooks().catch((e) => {
+      setInitError(`loadBooks failed: ${e}`);
+    });
   }, []);
 
   useEffect(() => {
@@ -36,12 +39,38 @@ function App() {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, []);
 
-  // Auto-navigate to reader when book is opened
+  // Auto-navigate to reader when book is opened, back to library when closed
   useEffect(() => {
     if (currentBook && page === "library") {
       setPage("reader");
+    } else if (!currentBook && page === "reader") {
+      setPage("library");
     }
   }, [currentBook]);
+
+  // Show init error if any
+  if (initError) {
+    return (
+      <div
+        style={{
+          padding: 40,
+          fontFamily: "monospace",
+          background: "#fff",
+          color: "#ef4444",
+          height: "100vh",
+        }}
+      >
+        <h2>初始化错误</h2>
+        <pre>{initError}</pre>
+        <button
+          style={{ marginTop: 16, padding: "8px 16px" }}
+          onClick={() => window.location.reload()}
+        >
+          刷新
+        </button>
+      </div>
+    );
+  }
 
   if (page === "stats") {
     return <Stats onClose={() => setPage("library")} />;

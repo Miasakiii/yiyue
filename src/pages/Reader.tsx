@@ -164,7 +164,7 @@ export function Reader() {
     loadChapter(chapterId);
   };
 
-  if (!currentBook || !currentChapter) {
+  if (!currentBook) {
     return (
       <div
         className="flex items-center justify-center h-screen"
@@ -178,6 +178,38 @@ export function Reader() {
           <div className="text-sm" style={{ color: "var(--text-tertiary)" }}>
             加载中...
           </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (!currentChapter) {
+    return (
+      <div
+        className="flex items-center justify-center h-screen"
+        style={{ background: "var(--bg-primary)", color: "var(--text-primary)" }}
+      >
+        <div className="flex flex-col items-center gap-4">
+          <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="var(--text-tertiary)" strokeWidth="1.5">
+            <path d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+          </svg>
+          <div className="text-sm" style={{ color: "var(--text-tertiary)" }}>
+            无法加载章节内容
+          </div>
+          <button
+            className="px-4 py-1.5 text-xs rounded-lg text-white"
+            style={{ background: "var(--accent)" }}
+            onClick={() => {
+              useAppStore.setState({
+                currentBook: null,
+                chapters: [],
+                currentChapter: null,
+                progress: null,
+              });
+            }}
+          >
+            返回书库
+          </button>
         </div>
       </div>
     );

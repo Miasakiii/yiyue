@@ -7,6 +7,8 @@ import type {
   Chapter,
   ReadingProgress,
   UpdateProgress,
+  Tag,
+  Group,
 } from "../types";
 
 interface AppState {
@@ -22,6 +24,12 @@ interface AppState {
   currentChapter: Chapter | null;
   progress: ReadingProgress | null;
 
+  // Tags & Groups
+  tags: Tag[];
+  groups: Group[];
+  activeTag: string | null;
+  activeGroup: string | null;
+
   // Theme
   theme: "light" | "dark" | "sepia";
 
@@ -36,6 +44,26 @@ interface AppState {
   deleteBook: (bookId: string) => Promise<void>;
   importBook: (filePath: string, encoding?: string) => Promise<Book>;
   setTheme: (theme: "light" | "dark" | "sepia") => void;
+
+  // Tag actions
+  loadTags: () => Promise<void>;
+  createTag: (name: string, color?: string) => Promise<void>;
+  deleteTag: (id: string) => Promise<void>;
+  setActiveTag: (tag: string | null) => void;
+
+  // Group actions
+  loadGroups: () => Promise<void>;
+  createGroup: (name: string, icon?: string) => Promise<void>;
+  deleteGroup: (id: string) => Promise<void>;
+  setActiveGroup: (groupId: string | null) => void;
+
+  // Book-Tag/Group actions
+  addBookTag: (bookId: string, tagId: string) => Promise<void>;
+  removeBookTag: (bookId: string, tagId: string) => Promise<void>;
+  getBookTags: (bookId: string) => Promise<Tag[]>;
+  addBookGroup: (bookId: string, groupId: string) => Promise<void>;
+  removeBookGroup: (bookId: string, groupId: string) => Promise<void>;
+  getBookGroups: (bookId: string) => Promise<Group[]>;
 }
 
 export const useAppStore = create<AppState>((set, get) => ({
@@ -47,6 +75,10 @@ export const useAppStore = create<AppState>((set, get) => ({
   chapters: [],
   currentChapter: null,
   progress: null,
+  tags: [],
+  groups: [],
+  activeTag: null,
+  activeGroup: null,
   theme: "light",
 
   loadBooks: async (filter?: BookFilter) => {
@@ -81,17 +113,20 @@ export const useAppStore = create<AppState>((set, get) => ({
 
       set({ currentBook: book, chapters, progress });
 
-      // Load the current chapter
+      // Load the current chapter — always resolve to a valid chapter
+      let chapter: Chapter | undefined;
       if (progress?.chapter_id) {
-        const chapter = chapters.find((c) => c.id === progress.chapter_id);
-        if (chapter) {
-          set({ currentChapter: chapter });
-        }
-      } else if (chapters.length > 0) {
-        set({ currentChapter: chapters[0] });
+        chapter = chapters.find((c) => c.id === progress.chapter_id);
       }
-    } catch (e) {
+      if (!chapter && chapters.length > 0) {
+        chapter = chapters[0];
+      }
+      set({ currentChapter: chapter ?? null });
+    } catch (e: any) {
+      const msg = e?.toString() || String(e);
       console.error("Failed to open book:", e);
+      // Show error to user
+      alert(`打开书籍失败: ${msg}`);
     }
   },
 
@@ -146,5 +181,134 @@ export const useAppStore = create<AppState>((set, get) => ({
   setTheme: (theme: "light" | "dark" | "sepia") => {
     document.documentElement.className = theme === "light" ? "" : theme;
     set({ theme });
+  },
+
+  // Tag actions
+  loadTags: async () => {
+    try {
+      const tags = await invoke<Tag[]>("get_tags");
+      set({ tags });
+    } catch (e) {
+      console.error("Failed to load tags:", e);
+    }
+  },
+
+  createTag: async (name: string, color?: string) => {
+    try {
+      await invoke("create_tag", { name, color });
+      get().loadTags();
+    } catch (e) {
+      console.error("Failed to create tag:", e);
+    }
+  },
+
+  deleteTag: async (id: string) => {
+    try {
+      await invoke("delete_tag", { id });
+      get().loadTags();
+      // If the deleted tag was active, clear the filter
+      if (get().activeTag) {
+        const tag = get().tags.find((t) => t.id === id);
+        if (tag && tag.name === get().activeTag) {
+          set({ activeTag: null });
+          get().loadBooks({ ...get().filter, tag: undefined });
+        }
+      }
+    } catch (e) {
+      console.error("Failed to delete tag:", e);
+    }
+  },
+
+  setActiveTag: (tag: string | null) => {
+    set({ activeTag: tag, activeGroup: null });
+    get().loadBooks({ ...get().filter, tag: tag || undefined, group: undefined });
+  },
+
+  // Group actions
+  loadGroups: async () => {
+    try {
+      const groups = await invoke<Group[]>("get_groups");
+      set({ groups });
+    } catch (e) {
+      console.error("Failed to load groups:", e);
+    }
+  },
+
+  createGroup: async (name: string, icon?: string) => {
+    try {
+      await invoke("create_group", { name, icon });
+      get().loadGroups();
+    } catch (e) {
+      console.error("Failed to create group:", e);
+    }
+  },
+
+  deleteGroup: async (id: string) => {
+    try {
+      await invoke("delete_group", { id });
+      get().loadGroups();
+      if (get().activeGroup === id) {
+        set({ activeGroup: null });
+        get().loadBooks({ ...get().filter, group: undefined });
+      }
+    } catch (e) {
+      console.error("Failed to delete group:", e);
+    }
+  },
+
+  setActiveGroup: (groupId: string | null) => {
+    set({ activeGroup: groupId, activeTag: null });
+    get().loadBooks({ ...get().filter, group: groupId || undefined, tag: undefined });
+  },
+
+  // Book-Tag/Group actions
+  addBookTag: async (bookId: string, tagId: string) => {
+    try {
+      await invoke("add_book_tag", { bookId, tagId });
+    } catch (e) {
+      console.error("Failed to add book tag:", e);
+    }
+  },
+
+  removeBookTag: async (bookId: string, tagId: string) => {
+    try {
+      await invoke("remove_book_tag", { bookId, tagId });
+    } catch (e) {
+      console.error("Failed to remove book tag:", e);
+    }
+  },
+
+  getBookTags: async (bookId: string) => {
+    try {
+      return await invoke<Tag[]>("get_book_tags", { bookId });
+    } catch (e) {
+      console.error("Failed to get book tags:", e);
+      return [];
+    }
+  },
+
+  addBookGroup: async (bookId: string, groupId: string) => {
+    try {
+      await invoke("add_book_group", { bookId, groupId });
+    } catch (e) {
+      console.error("Failed to add book group:", e);
+    }
+  },
+
+  removeBookGroup: async (bookId: string, groupId: string) => {
+    try {
+      await invoke("remove_book_group", { bookId, groupId });
+    } catch (e) {
+      console.error("Failed to remove book group:", e);
+    }
+  },
+
+  getBookGroups: async (bookId: string) => {
+    try {
+      return await invoke<Group[]>("get_book_groups", { bookId });
+    } catch (e) {
+      console.error("Failed to get book groups:", e);
+      return [];
+    }
   },
 }));

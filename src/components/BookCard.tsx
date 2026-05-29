@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useAppStore } from "../stores/app";
 import type { BookListItem } from "../types";
 
@@ -25,7 +26,8 @@ const FORMAT_LABELS: Record<string, string> = {
 };
 
 export function BookCard({ book, viewMode }: BookCardProps) {
-  const { openBook, toggleFavorite } = useAppStore();
+  const { openBook, toggleFavorite, deleteBook } = useAppStore();
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   const formatSize = (bytes: number) => {
     if (bytes < 1024) return `${bytes} B`;
@@ -41,6 +43,18 @@ export function BookCard({ book, viewMode }: BookCardProps) {
 
   const formatColor = FORMAT_COLORS[book.format] || "#6366f1";
   const progress = Math.min(book.reading_percentage || 0, 100);
+
+  const handleDelete = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (showDeleteConfirm) {
+      deleteBook(book.id);
+      setShowDeleteConfirm(false);
+    } else {
+      setShowDeleteConfirm(true);
+      // Auto-cancel after 3 seconds
+      setTimeout(() => setShowDeleteConfirm(false), 3000);
+    }
+  };
 
   if (viewMode === "list") {
     return (
@@ -61,6 +75,7 @@ export function BookCard({ book, viewMode }: BookCardProps) {
           e.currentTarget.style.background = "var(--bg-secondary)";
           e.currentTarget.style.borderColor = "var(--border-light)";
           e.currentTarget.style.boxShadow = "none";
+          setShowDeleteConfirm(false);
         }}
       >
         {/* Format badge */}
@@ -120,6 +135,22 @@ export function BookCard({ book, viewMode }: BookCardProps) {
               <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
             </svg>
           </button>
+
+          {/* Delete button */}
+          <button
+            className="p-1.5 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity"
+            style={{
+              color: showDeleteConfirm ? "#ef4444" : "var(--text-tertiary)",
+              background: showDeleteConfirm ? "rgba(239, 68, 68, 0.1)" : "transparent",
+            }}
+            onClick={handleDelete}
+            title={showDeleteConfirm ? "确认删除" : "删除"}
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <polyline points="3 6 5 6 21 6" />
+              <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+            </svg>
+          </button>
         </div>
       </div>
     );
@@ -143,6 +174,7 @@ export function BookCard({ book, viewMode }: BookCardProps) {
         e.currentTarget.style.transform = "translateY(0)";
         e.currentTarget.style.boxShadow = "none";
         e.currentTarget.style.borderColor = "var(--border-light)";
+        setShowDeleteConfirm(false);
       }}
     >
       {/* Cover */}
@@ -222,6 +254,23 @@ export function BookCard({ book, viewMode }: BookCardProps) {
             </svg>
           </div>
         )}
+
+        {/* Delete button (hover) */}
+        <button
+          className="absolute bottom-2 right-2 p-1.5 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity"
+          style={{
+            background: showDeleteConfirm ? "rgba(239, 68, 68, 0.9)" : "rgba(0,0,0,0.5)",
+            color: "white",
+            backdropFilter: "blur(4px)",
+          }}
+          onClick={handleDelete}
+          title={showDeleteConfirm ? "确认删除" : "删除"}
+        >
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <polyline points="3 6 5 6 21 6" />
+            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+          </svg>
+        </button>
       </div>
 
       {/* Info */}

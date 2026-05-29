@@ -12,6 +12,7 @@ use tauri::Manager;
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_dialog::init())
         .setup(|app| {
             let conn = db::init_db(&app.handle())?;
             app.manage(db::DbConn { conn: std::sync::Mutex::new(conn) });
@@ -40,6 +41,7 @@ pub fn run() {
             commands::tags::delete_group,
             commands::tags::add_book_group,
             commands::tags::remove_book_group,
+            commands::tags::get_book_groups,
             commands::annotations::get_annotations,
             commands::annotations::create_annotation,
             commands::annotations::update_annotation,

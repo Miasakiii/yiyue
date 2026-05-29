@@ -39,8 +39,8 @@ fn get_format(path: &Path) -> String {
         .to_lowercase()
 }
 
-#[tauri::command]
-pub fn import_book(
+#[tauri::command(async)]
+pub async fn import_book(
     app: AppHandle,
     db: State<'_, DbConn>,
     file_path: String,
@@ -55,12 +55,12 @@ pub fn import_book(
     let file_size = fs::metadata(path).map_err(|e| e.to_string())?.len() as i64;
     let file_hash = compute_hash(path)?;
 
-    // Check for duplicates
+    // Check for duplicates (ignore soft-deleted books)
     {
         let conn = db.conn.lock().map_err(|e| e.to_string())?;
         let exists: bool = conn
             .query_row(
-                "SELECT COUNT(*) FROM books WHERE file_hash = ?1",
+                "SELECT COUNT(*) FROM books WHERE file_hash = ?1 AND deleted_at IS NULL",
                 params![file_hash],
                 |row| row.get::<_, i64>(0),
             )
@@ -70,6 +70,13 @@ pub fn import_book(
         if exists {
             return Err("Book already imported".to_string());
         }
+
+        // If soft-deleted, permanently remove it so we can re-import
+        conn.execute(
+            "DELETE FROM books WHERE file_hash = ?1 AND deleted_at IS NOT NULL",
+            params![file_hash],
+        )
+        .map_err(|e| e.to_string())?;
     }
 
     // Copy file to library
@@ -318,8 +325,8 @@ pub fn import_book(
     })
 }
 
-#[tauri::command]
-pub fn import_folder(
+#[tauri::command(async)]
+pub async fn import_folder(
     app: AppHandle,
     db: State<'_, DbConn>,
     folder_path: String,
@@ -336,12 +343,12 @@ pub fn import_folder(
     // Generate a hash from folder path
     let file_hash = blake3::hash(folder_path.as_bytes()).to_hex().to_string();
 
-    // Check for duplicates
+    // Check for duplicates (ignore soft-deleted books)
     {
         let conn = db.conn.lock().map_err(|e| e.to_string())?;
         let exists: bool = conn
             .query_row(
-                "SELECT COUNT(*) FROM books WHERE file_hash = ?1",
+                "SELECT COUNT(*) FROM books WHERE file_hash = ?1 AND deleted_at IS NULL",
                 params![file_hash],
                 |row| row.get::<_, i64>(0),
             )
@@ -351,6 +358,13 @@ pub fn import_folder(
         if exists {
             return Err("Folder already imported".to_string());
         }
+
+        // If soft-deleted, permanently remove it so we can re-import
+        conn.execute(
+            "DELETE FROM books WHERE file_hash = ?1 AND deleted_at IS NOT NULL",
+            params![file_hash],
+        )
+        .map_err(|e| e.to_string())?;
     }
 
     let book_id = Uuid::new_v4().to_string();

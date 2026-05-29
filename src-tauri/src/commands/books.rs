@@ -20,7 +20,7 @@ pub fn get_books(
     });
 
     let mut sql = String::from(
-        "SELECT b.id, b.kind, b.title, b.author, b.format, b.cover_path, b.file_size,
+        "SELECT DISTINCT b.id, b.kind, b.title, b.author, b.format, b.cover_path, b.file_size,
                 b.total_chapters, b.added_at, b.updated_at,
                 COALESCE(rp.percentage, 0) as reading_percentage,
                 CASE WHEN f.book_id IS NOT NULL THEN 1 ELSE 0 END as starred
@@ -46,6 +46,16 @@ pub fn get_books(
 
     if filter.starred == Some(true) {
         sql.push_str(" AND f.book_id IS NOT NULL");
+    }
+
+    if let Some(ref tag) = filter.tag {
+        sql.push_str(" AND EXISTS (SELECT 1 FROM book_tags bt JOIN tags t ON bt.tag_id = t.id WHERE bt.book_id = b.id AND t.name = ?)");
+        param_values.push(Box::new(tag.clone()));
+    }
+
+    if let Some(ref group) = filter.group {
+        sql.push_str(" AND EXISTS (SELECT 1 FROM book_groups bg JOIN groups g ON bg.group_id = g.id WHERE bg.book_id = b.id AND g.id = ?)");
+        param_values.push(Box::new(group.clone()));
     }
 
     let sort = filter.sort_by.as_deref().unwrap_or("last_read");

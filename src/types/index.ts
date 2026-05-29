@@ -62,6 +62,22 @@ export interface BookFilter {
   sort_by?: string;
 }
 
+export interface Tag {
+  id: string;
+  name: string;
+  color: string;
+  parent_id: string | null;
+  sort_order: number;
+}
+
+export interface Group {
+  id: string;
+  name: string;
+  parent_id: string | null;
+  icon: string | null;
+  sort_order: number;
+}
+
 export interface UpdateBook {
   title?: string;
   author?: string;

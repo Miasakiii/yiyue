@@ -210,3 +210,35 @@ pub fn remove_book_group(
     .map_err(|e| e.to_string())?;
     Ok(())
 }
+
+#[tauri::command]
+pub fn get_book_groups(db: State<'_, DbConn>, book_id: String) -> Result<Vec<Group>, String> {
+    let conn = db.conn.lock().map_err(|e| e.to_string())?;
+    let mut stmt = conn
+        .prepare(
+            "SELECT g.id, g.name, g.parent_id, g.icon, g.sort_order
+             FROM groups g
+             JOIN book_groups bg ON bg.group_id = g.id
+             WHERE bg.book_id = ?1
+             ORDER BY g.sort_order, g.name",
+        )
+        .map_err(|e| e.to_string())?;
+
+    let rows = stmt
+        .query_map(params![book_id], |row| {
+            Ok(Group {
+                id: row.get(0)?,
+                name: row.get(1)?,
+                parent_id: row.get(2)?,
+                icon: row.get(3)?,
+                sort_order: row.get(4)?,
+            })
+        })
+        .map_err(|e| e.to_string())?;
+
+    let mut groups = Vec::new();
+    for row in rows {
+        groups.push(row.map_err(|e| e.to_string())?);
+    }
+    Ok(groups)
+}
