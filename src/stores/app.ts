@@ -131,10 +131,19 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   loadChapter: async (chapterId: string) => {
-    // For now, return empty string - will be implemented with content loading
     const chapter = get().chapters.find((c) => c.id === chapterId);
     if (chapter) {
       set({ currentChapter: chapter });
+      // Fetch content via IPC — the Reader component also does this in its
+      // own useEffect, but having it here allows callers (e.g. keyboard nav)
+      // to preload content without waiting for the Reader to re-render.
+      try {
+        const content = await invoke<string>("get_chapter_content", { chapterId });
+        return content;
+      } catch (e) {
+        console.error("Failed to load chapter content:", e);
+        return "";
+      }
     }
     return "";
   },
