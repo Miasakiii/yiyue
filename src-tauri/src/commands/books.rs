@@ -237,7 +237,7 @@ pub fn get_progress(
                 book_id: row.get(0)?,
                 chapter_id: row.get(1)?,
                 scroll_offset: row.get(2)?,
-                page_index: row.get(3)?,
+                page_index: row.get::<_, Option<i64>>(3)?.unwrap_or(0),
                 percentage: row.get(4)?,
                 last_read_at: row.get(5)?,
             })
@@ -261,7 +261,7 @@ pub fn update_progress(
 
     conn.execute(
         "INSERT INTO reading_progress (book_id, chapter_id, scroll_offset, page_index, percentage, last_read_at)
-         VALUES (?1, ?2, ?3, ?4, ?5, datetime('now'))
+         VALUES (?1, ?2, ?3, COALESCE(?4, 0), ?5, datetime('now'))
          ON CONFLICT(book_id) DO UPDATE SET
              chapter_id = COALESCE(?2, chapter_id),
              scroll_offset = COALESCE(?3, scroll_offset),

@@ -1,16 +1,11 @@
 use crate::parser::{DocMetadata, ParsedChapter, ParsedDocument, ParseError, ParseOptions};
 
 pub fn parse(path: &std::path::Path, _opts: &ParseOptions) -> Result<ParsedDocument, ParseError> {
-    // Read file bytes once — used for both text extraction and metadata parsing.
-    // Previously: extract_text(path) + FileOptions::open(path) = 2 disk reads + 2 parses.
-    // Now: 1 disk read, 1 parse for text, 1 parse for metadata from the same bytes.
-    let file_bytes = std::fs::read(path)?;
-
-    // Extract text using pdf-extract from memory buffer (no second disk read)
-    let text = pdf_extract::extract_text_from_mem(&file_bytes)
+    // Extract text using pdf-extract (path-based — best compatibility)
+    let text = pdf_extract::extract_text(path.to_str().unwrap_or(""))
         .map_err(|e| ParseError::Parse(format!("Failed to extract PDF text: {}", e)))?;
 
-    // Get metadata from the pdf crate — load from the same bytes
+    // Get metadata from the pdf crate (separate open — needed for title/author)
     let mut title = path
         .file_stem()
         .and_then(|s| s.to_str())
@@ -18,7 +13,7 @@ pub fn parse(path: &std::path::Path, _opts: &ParseOptions) -> Result<ParsedDocum
         .to_string();
     let mut author = None;
 
-    if let Ok(file) = pdf::file::FileOptions::cached().load(file_bytes) {
+    if let Ok(file) = pdf::file::FileOptions::cached().open(path) {
         if let Some(ref info_dict) = file.trailer.info_dict {
             if let Some(ref t) = info_dict.title {
                 title = t.to_string_lossy();

@@ -168,6 +168,17 @@ pub async fn import_book(
                     chapters: parsed.chapters,
                 })
             }
+            "docx" => {
+                let opts = ParseOptions {
+                    encoding: None,
+                    chapter_pattern: None,
+                };
+                let parsed = parser::docx::parse(&path, &opts).map_err(|e| e.to_string())?;
+                Ok(ParsedImport::Novel {
+                    metadata: parsed.metadata,
+                    chapters: parsed.chapters,
+                })
+            }
             "cbz" => {
                 let comic = parser::comic::parse_cbz(&path, &comic_cache_dir)
                     .map_err(|e| e.to_string())?;

@@ -1,4 +1,5 @@
 pub mod comic;
+pub mod docx;
 pub mod epub;
 pub mod markdown;
 pub mod pdf;

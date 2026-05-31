@@ -41,7 +41,7 @@ export function Library({ onShowStats, onShowSync }: { onShowStats?: () => void;
     localStorage.setItem("sidebar-collapsed", String(sidebarCollapsed));
   }, [sidebarCollapsed]);
 
-  const SUPPORTED_EXTENSIONS = ["txt", "epub", "pdf", "md", "markdown", "cbz"];
+  const SUPPORTED_EXTENSIONS = ["txt", "epub", "pdf", "md", "markdown", "cbz", "docx"];
 
   const [importError, setImportError] = useState<string | null>(null);
   const [isDragging, setIsDragging] = useState(false);
@@ -69,7 +69,7 @@ export function Library({ onShowStats, onShowSync }: { onShowStats?: () => void;
               return SUPPORTED_EXTENSIONS.includes(ext);
             });
             if (paths.length === 0) {
-              setImportError("没有支持的文件格式（TXT/EPUB/PDF/MD/CBZ）");
+              setImportError("没有支持的文件格式（TXT/EPUB/PDF/MD/CBZ/DOCX）");
               return;
             }
             await importPaths(paths);
