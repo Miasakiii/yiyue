@@ -239,7 +239,6 @@ fn calculate_streaks(dates: &[String]) -> (i64, i64) {
         return (0, 0);
     }
 
-    let mut current_streak = 1i64;
     let mut longest_streak = 1i64;
     let mut streak = 1i64;
 
@@ -264,11 +263,11 @@ fn calculate_streaks(dates: &[String]) -> (i64, i64) {
         .format("%Y-%m-%d")
         .to_string();
 
-    if dates.first() == Some(&today) || dates.first() == Some(&yesterday) {
-        current_streak = streak;
+    let current_streak = if dates.first() == Some(&today) || dates.first() == Some(&yesterday) {
+        streak
     } else {
-        current_streak = 0;
-    }
+        0
+    };
 
     (current_streak, longest_streak)
 }

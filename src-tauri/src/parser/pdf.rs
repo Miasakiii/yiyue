@@ -29,6 +29,7 @@ pub fn parse(path: &std::path::Path, _opts: &ParseOptions) -> Result<ParsedDocum
 
     let mut chapters = Vec::new();
     let mut full_text = String::new();
+    let mut char_offset = 0usize;
 
     for (i, page_text) in pages.iter().enumerate() {
         let page_text = page_text.trim();
@@ -36,12 +37,14 @@ pub fn parse(path: &std::path::Path, _opts: &ParseOptions) -> Result<ParsedDocum
             continue;
         }
 
-        let start_offset = full_text.len();
+        let start_offset = char_offset;
         if !full_text.is_empty() {
             full_text.push('\n');
+            char_offset += 1;
         }
         full_text.push_str(page_text);
-        let end_offset = full_text.len();
+        char_offset += page_text.chars().count();
+        let end_offset = char_offset;
 
         chapters.push(ParsedChapter {
             title: format!("第 {} 页", i + 1),
@@ -56,12 +59,13 @@ pub fn parse(path: &std::path::Path, _opts: &ParseOptions) -> Result<ParsedDocum
     // If no pages were split (no form feed), treat the whole text as one chapter
     if chapters.is_empty() && !text.trim().is_empty() {
         let text = text.trim().to_string();
+        let char_count = text.chars().count();
         chapters.push(ParsedChapter {
             title: "全文".to_string(),
             level: 1,
             start_offset: 0,
-            end_offset: text.len(),
-            char_count: text.chars().count(),
+            end_offset: char_count,
+            char_count,
             content: text.clone(),
         });
         full_text = text;

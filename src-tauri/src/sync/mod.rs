@@ -53,11 +53,6 @@ impl WebDavClient {
         format!("{}/{}", base, path)
     }
 
-    fn auth(&self) -> reqwest::blocking::RequestBuilder {
-        // This is a helper - actual usage needs the URL
-        unimplemented!()
-    }
-
     /// Create directory on WebDAV server
     pub fn mkdir(&self, path: &str) -> Result<(), String> {
         let url = format!("{}/{}", self.base_url().trim_end_matches('/'), path.trim_start_matches('/'));
@@ -114,72 +109,6 @@ impl WebDavClient {
                 .map_err(|e| format!("Failed to read response: {}", e))
         } else {
             Err(format!("WebDAV GET failed: {}", resp.status()))
-        }
-    }
-
-    /// Delete file from WebDAV server
-    pub fn delete(&self, path: &str) -> Result<(), String> {
-        let url = format!("{}/{}", self.base_url().trim_end_matches('/'), path.trim_start_matches('/'));
-
-        let resp = self
-            .client
-            .delete(&url)
-            .basic_auth(&self.config.username, Some(&self.config.password))
-            .send()
-            .map_err(|e| format!("WebDAV DELETE failed: {}", e))?;
-
-        if resp.status().is_success() || resp.status() == 404 {
-            Ok(())
-        } else {
-            Err(format!("WebDAV DELETE failed: {}", resp.status()))
-        }
-    }
-
-    /// List files in WebDAV directory
-    pub fn list(&self, path: &str) -> Result<Vec<String>, String> {
-        let url = format!(
-            "{}/{}/",
-            self.base_url().trim_end_matches('/'),
-            path.trim_start_matches('/').trim_end_matches('/')
-        );
-
-        let body = r#"<?xml version="1.0" encoding="utf-8"?>
-<D:propfind xmlns:D="DAV:">
-  <D:prop>
-    <D:resourcetype/>
-    <D:getcontentlength/>
-    <D:getlastmodified/>
-  </D:prop>
-</D:propfind>"#;
-
-        let resp = self
-            .client
-            .request(reqwest::Method::from_bytes(b"PROPFIND").unwrap(), &url)
-            .basic_auth(&self.config.username, Some(&self.config.password))
-            .header("Depth", "1")
-            .header("Content-Type", "application/xml")
-            .body(body)
-            .send()
-            .map_err(|e| format!("WebDAV PROPFIND failed: {}", e))?;
-
-        if resp.status().is_success() || resp.status() == 207 {
-            let text = resp.text().unwrap_or_default();
-            // Simple XML parsing for href values
-            let mut files = Vec::new();
-            for line in text.lines() {
-                if let Some(start) = line.find("<D:href>") {
-                    if let Some(end) = line.find("</D:href>") {
-                        let href = &line[start + 8..end];
-                        let name = href.rsplit('/').next().unwrap_or(href);
-                        if !name.is_empty() {
-                            files.push(name.to_string());
-                        }
-                    }
-                }
-            }
-            Ok(files)
-        } else {
-            Err(format!("WebDAV PROPFIND failed: {}", resp.status()))
         }
     }
 

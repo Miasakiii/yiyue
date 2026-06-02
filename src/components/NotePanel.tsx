@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
+import { HIGHLIGHT_COLORS } from "../constants";
 
 interface Annotation {
   id: string;
@@ -40,11 +41,11 @@ export function NotePanel({
   const handleExport = useCallback(async (format: string) => {
     try {
       const content = await invoke<string>("export_annotations", {
-        bookId: null,
+        bookId,
         format,
       });
       const filename = await invoke<string>("get_export_filename", {
-        bookId: null,
+        bookId,
         format,
       });
 
@@ -118,16 +119,6 @@ export function NotePanel({
       ? annotations
       : annotations.filter((a) => a.color === filter);
 
-  const COLORS = [
-    { color: "#EF4444", name: "重点" },
-    { color: "#F97316", name: "存疑" },
-    { color: "#EAB308", name: "标记" },
-    { color: "#22C55E", name: "灵感" },
-    { color: "#3B82F6", name: "引用" },
-    { color: "#A855F7", name: "感悟" },
-    { color: "#6B7280", name: "待确认" },
-  ];
-
   if (!visible) return null;
 
   return (
@@ -200,7 +191,7 @@ export function NotePanel({
         >
           全部
         </button>
-        {COLORS.map((c) => (
+        {HIGHLIGHT_COLORS.map((c) => (
           <button
             key={c.color}
             className="w-5 h-5 rounded-full border-2 flex-shrink-0"

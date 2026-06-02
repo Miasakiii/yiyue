@@ -69,30 +69,3 @@ pub fn apply_rules(text: &str, rules: &[Rule]) -> (String, usize) {
 
     (result, total_replacements)
 }
-
-/// Normalize text formatting: merge consecutive blank lines, trim whitespace.
-pub fn normalize_text(text: &str) -> String {
-    let lines: Vec<&str> = text.lines().collect();
-    let mut result = Vec::new();
-    let mut prev_blank = false;
-
-    for line in &lines {
-        let trimmed = line.trim();
-        if trimmed.is_empty() {
-            if !prev_blank {
-                result.push("");
-                prev_blank = true;
-            }
-        } else {
-            result.push(trimmed);
-            prev_blank = false;
-        }
-    }
-
-    // Remove trailing blank lines
-    while result.last().map_or(false, |l| l.is_empty()) {
-        result.pop();
-    }
-
-    result.join("\n")
-}

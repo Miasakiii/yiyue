@@ -1,15 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
-
-const HIGHLIGHT_COLORS = [
-  { color: "#EF4444", name: "重点", key: "1" },
-  { color: "#F97316", name: "存疑", key: "2" },
-  { color: "#EAB308", name: "标记", key: "3" },
-  { color: "#22C55E", name: "灵感", key: "4" },
-  { color: "#3B82F6", name: "引用", key: "5" },
-  { color: "#A855F7", name: "感悟", key: "6" },
-  { color: "#6B7280", name: "待确认", key: "7" },
-];
+import { HIGHLIGHT_COLORS } from "../constants";
 
 interface HighlightPopoverProps {
   bookId: string;
@@ -115,10 +106,6 @@ export function HighlightPopover({
     setShowNoteInput(true);
   };
 
-  const handleQuickHighlight = (color: string) => {
-    createHighlight(color);
-  };
-
   const handleSaveNote = () => {
     createHighlight(pendingColor, noteText || undefined);
   };
@@ -200,7 +187,7 @@ export function HighlightPopover({
                 background: c.color,
                 borderColor: "transparent",
               }}
-              onClick={() => handleQuickHighlight(c.color)}
+              onClick={() => createHighlight(c.color)}
               onContextMenu={(e) => {
                 e.preventDefault();
                 handleColorClick(c.color);

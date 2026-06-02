@@ -2,7 +2,7 @@
 
 > 本地优先的桌面阅读器 — 翻开一页，沉浸阅读
 
-一款基于 **Tauri 2.0** 的轻量桌面阅读器，支持 TXT、EPUB、PDF、Markdown、CBZ 等格式，提供干净的阅读体验、笔记系统、全文搜索和 WebDAV 同步。
+一款基于 **Tauri 2.0** 的轻量桌面阅读器，支持 TXT、EPUB、PDF、Markdown、DOCX、CBZ 等格式，提供干净的阅读体验、笔记系统、全文搜索和 WebDAV 同步。
 
 ---
 
@@ -12,13 +12,14 @@
 - **TXT** — 自动编码检测 (GBK/UTF-8)、章节智能切分、干扰词过滤
 - **EPUB** — 元数据提取、HTML 渲染
 - **PDF** — 页码章节、纯 Rust 解析
+- **DOCX** — Word 文档解析、标题检测章节切分
 - **Markdown** — pulldown-cmark 渲染、语法高亮
 - **CBZ / 文件夹漫画** — 单页模式 + 条漫/滚动模式
 
 ### 笔记系统
 - 7 色划线标注（重点、存疑、标记、灵感、引用、感悟、待确认）
 - 划线后添加 Markdown 笔记
-- 笔记导出：Markdown / HTML / JSON
+- 笔记导出：Markdown / HTML / JSON（按书籍筛选）
 
 ### 全局搜索
 - jieba 中文分词 + SQLite FTS5 全文索引
@@ -36,9 +37,11 @@
 - Push / Pull / Full Sync 三种模式
 
 ### 个性化
-- 3 种主题：浅色 / 深色 / 护眼
-- 字号调节 (12-36px)，Ctrl+=/- 快捷
+
+- 3 种主题：浅色 / 深色 / 护眼（优化配色）
+- 字号滑块 (12-36px)、行高、字体族、内容宽度、段间距、对齐方式
 - 网格/列表视图切换，多种排序方式
+- 侧边栏折叠图标快捷导航
 
 ---
 
@@ -47,12 +50,12 @@
 | 层 | 技术 |
 |---|---|
 | 桌面框架 | Tauri 2.0 |
-| 前端 | React 18 + TypeScript + Vite + Tailwind CSS |
+| 前端 | React 19 + TypeScript + Vite 7 + Tailwind CSS 4 |
 | 状态管理 | Zustand |
 | 后端 | Rust (tokio) |
 | 数据库 | SQLite (rusqlite) + FTS5 |
 | 中文分词 | jieba-rs |
-| 依赖 | epub, pdf, pulldown-cmark, reqwest, zip, blake3, chardetng |
+| 依赖 | epub, pdf, pdf-extract, docx-rs, pulldown-cmark, reqwest, zip, blake3, chardetng |
 
 ---
 
@@ -92,6 +95,10 @@ pnpm tauri build
 一页/
 ├── src/                          # React 前端
 │   ├── App.tsx                   # 根组件 / 路由
+│   ├── App.css                   # 全局样式 + 主题变量
+│   ├── constants.ts              # 共享常量
+│   ├── hooks/                    # 共享 hooks
+│   │   └── useFullscreen.ts      # 全屏切换
 │   ├── stores/app.ts             # Zustand 状态管理
 │   ├── components/               # 通用组件
 │   │   ├── BookCard.tsx          # 书籍卡片
@@ -107,19 +114,18 @@ pnpm tauri build
 │   └── types/index.ts            # TypeScript 类型
 ├── src-tauri/                    # Rust 后端
 │   ├── src/
-│   │   ├── lib.rs                # 入口 (42 个 IPC 命令)
+│   │   ├── lib.rs                # 入口 (44 个 IPC 命令)
 │   │   ├── commands/             # Tauri 命令层
 │   │   ├── db/                   # SQLite 数据库
-│   │   ├── parser/               # 格式解析器
+│   │   ├── parser/               # 格式解析器 (txt/epub/pdf/docx/md/comic)
 │   │   ├── rules/                # 规则引擎
-│   │   ├── search/               # 搜索引擎
+│   │   ├── search/               # 搜索引擎 (jieba 分词)
 │   │   ├── sync/                 # WebDAV 同步
 │   │   ├── models/               # 数据模型
 │   │   └── main.rs
 │   ├── Cargo.toml
 │   └── tauri.conf.json
 ├── PRD.md                        # 产品需求文档
-├── STATUS.md                     # 项目状态分析
 └── README.md
 ```
 
@@ -132,6 +138,7 @@ pnpm tauri build
 | TXT | ✅ | ✅ | 编码检测 + 章节切分 + 干扰词过滤 |
 | EPUB | ✅ | ✅ | 元数据 + HTML 渲染 |
 | PDF | ✅ | ✅ | 纯 Rust 解析 |
+| DOCX | ✅ | ✅ | Word 文档、标题检测章节切分 |
 | Markdown | ✅ | ✅ | pulldown-cmark 渲染 |
 | CBZ | ✅ | ✅ | 漫画压缩包 |
 | 文件夹漫画 | ✅ | ✅ | 图片目录 |

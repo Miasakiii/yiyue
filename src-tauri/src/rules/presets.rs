@@ -89,8 +89,3 @@ pub fn web_novel_cleaner() -> RuleSet {
         ],
     }
 }
-
-/// Get all preset rule sets.
-pub fn all_presets() -> Vec<RuleSet> {
-    vec![web_novel_cleaner()]
-}

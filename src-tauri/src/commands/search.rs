@@ -125,10 +125,6 @@ pub fn search_all(
         let rows = stmt
             .query_map(rusqlite::params![tokenized], |row| {
                 let selected_text: Option<String> = row.get(4)?;
-                let content: Option<String> = row.get(5)?;
-                let _matched = content
-                    .or(selected_text.clone())
-                    .unwrap_or_default();
                 Ok(SearchResult {
                     result_type: "annotation".to_string(),
                     id: row.get(0)?,

@@ -11,14 +11,6 @@ pub fn parse(path: &std::path::Path, _opts: &ParseOptions) -> Result<ParsedDocum
         .unwrap_or("Untitled")
         .to_string();
 
-    // Parse markdown to HTML
-    let mut options = Options::empty();
-    options.insert(Options::ENABLE_TABLES);
-    options.insert(Options::ENABLE_FOOTNOTES);
-    options.insert(Options::ENABLE_STRIKETHROUGH);
-    options.insert(Options::ENABLE_TASKLISTS);
-    options.insert(Options::ENABLE_HEADING_ATTRIBUTES);
-
     // Split by headings using line-based detection
     let lines: Vec<&str> = content.lines().collect();
     let mut chapters = Vec::new();

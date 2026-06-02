@@ -2,7 +2,6 @@ use crate::db::DbConn;
 use crate::sync::{SyncStatus, WebDavClient, WebDavConfig};
 use rusqlite::params;
 use serde::{Deserialize, Serialize};
-use std::sync::Mutex;
 use tauri::State;
 
 #[derive(Debug, Serialize, Deserialize)]

@@ -11,7 +11,7 @@ import "./App.css";
 type Page = "library" | "reader" | "stats" | "sync";
 
 function App() {
-  const { currentBook, loadBooks, theme } = useAppStore();
+  const { currentBook, loadBooks } = useAppStore();
   const [showSearch, setShowSearch] = useState(false);
   const [page, setPage] = useState<Page>("library");
   const [initError, setInitError] = useState<string | null>(null);
@@ -20,11 +20,14 @@ function App() {
     loadBooks().catch((e) => {
       setInitError(`loadBooks failed: ${e}`);
     });
-  }, []);
+  }, [loadBooks]);
 
+  // Apply persisted theme on mount
   useEffect(() => {
-    document.documentElement.className = theme === "light" ? "" : theme;
-  }, [theme]);
+    const theme = useAppStore.getState().theme;
+    document.documentElement.classList.remove("dark", "sepia");
+    if (theme !== "light") document.documentElement.classList.add(theme);
+  }, []);
 
   // Global keyboard shortcut: Ctrl+Shift+F for search
   useEffect(() => {
@@ -46,7 +49,7 @@ function App() {
     } else if (!currentBook && page === "reader") {
       setPage("library");
     }
-  }, [currentBook]);
+  }, [currentBook, page]);
 
   // Show init error if any
   if (initError) {

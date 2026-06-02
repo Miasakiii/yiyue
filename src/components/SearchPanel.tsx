@@ -2,6 +2,14 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { useAppStore } from "../stores/app";
 
+/** Sanitize FTS5 snippet: escape HTML but preserve <mark> tags */
+function sanitizeSnippet(html: string): string {
+  return html
+    .replace(/&(?!amp;|lt;|gt;|quot;|#39;)/g, "&amp;")
+    .replace(/<(?!\/?mark>)/g, "&lt;")
+    .replace(/(?<!<\/?)mark>/g, "&gt;");
+}
+
 interface SearchResult {
   result_type: string;
   id: string;
@@ -253,7 +261,7 @@ export function SearchPanel({
                       <div
                         className="text-xs line-clamp-2"
                         style={{ color: "var(--text-secondary)" }}
-                        dangerouslySetInnerHTML={{ __html: result.snippet }}
+                        dangerouslySetInnerHTML={{ __html: sanitizeSnippet(result.snippet) }}
                       />
                     </div>
                     <span

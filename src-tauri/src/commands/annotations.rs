@@ -200,6 +200,7 @@ pub fn update_annotation(
     }
 
     sets.push("updated_at = datetime('now')");
+    let id_clone = id.clone();
     param_values.push(Box::new(id));
 
     let sql = format!("UPDATE annotations SET {} WHERE id = ?", sets.join(", "));
@@ -208,12 +209,23 @@ pub fn update_annotation(
     conn.execute(&sql, params_refs.as_slice())
         .map_err(|e| e.to_string())?;
 
+    // Update FTS index with new content
+    let _ = conn.execute(
+        "UPDATE annotations_fts SET content = (SELECT content FROM annotations WHERE id = ?1) WHERE rowid = (SELECT rowid FROM annotations WHERE id = ?1)",
+        params![id_clone],
+    );
+
     Ok(())
 }
 
 #[tauri::command]
 pub fn delete_annotation(db: State<'_, DbConn>, id: String) -> Result<(), String> {
     let conn = db.conn.lock().map_err(|e| e.to_string())?;
+    // Remove from FTS before soft-delete
+    let _ = conn.execute(
+        "DELETE FROM annotations_fts WHERE rowid = (SELECT rowid FROM annotations WHERE id = ?1)",
+        params![id],
+    );
     conn.execute(
         "UPDATE annotations SET deleted_at = datetime('now') WHERE id = ?1",
         params![id],

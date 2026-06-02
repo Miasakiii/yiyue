@@ -1,7 +1,7 @@
 use crate::models::{ComicChapter, ComicMetadata, ComicPage};
 use std::fs;
 use std::io::Read;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 const IMAGE_EXTENSIONS: &[&str] = &["jpg", "jpeg", "png", "webp", "gif", "bmp", "tiff"];
 

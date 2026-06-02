@@ -1,12 +1,20 @@
 import { useState, useEffect } from "react";
 import { useAppStore } from "../stores/app";
 import { BookCard } from "../components/BookCard";
+import { SUPPORTED_EXTENSIONS } from "../constants";
 
 type SortKey = "recent" | "added" | "title" | "progress";
 
 const TAG_COLORS = [
   "#6366f1", "#8b5cf6", "#ef4444", "#f59e0b",
   "#22c55e", "#06b6d4", "#ec4899", "#6b7280",
+];
+
+const SORT_OPTIONS: { key: SortKey; label: string }[] = [
+  { key: "recent", label: "最近阅读" },
+  { key: "added", label: "最近添加" },
+  { key: "title", label: "书名" },
+  { key: "progress", label: "阅读进度" },
 ];
 
 export function Library({ onShowStats, onShowSync }: { onShowStats?: () => void; onShowSync?: () => void }) {
@@ -40,8 +48,6 @@ export function Library({ onShowStats, onShowSync }: { onShowStats?: () => void;
   useEffect(() => {
     localStorage.setItem("sidebar-collapsed", String(sidebarCollapsed));
   }, [sidebarCollapsed]);
-
-  const SUPPORTED_EXTENSIONS = ["txt", "epub", "pdf", "md", "markdown", "cbz", "docx"];
 
   const [importError, setImportError] = useState<string | null>(null);
   const [isDragging, setIsDragging] = useState(false);
@@ -183,13 +189,6 @@ export function Library({ onShowStats, onShowSync }: { onShowStats?: () => void;
     }
   });
 
-  const SORT_OPTIONS: { key: SortKey; label: string }[] = [
-    { key: "recent", label: "最近阅读" },
-    { key: "added", label: "最近添加" },
-    { key: "title", label: "书名" },
-    { key: "progress", label: "阅读进度" },
-  ];
-
   const hasActiveFilter = activeTag !== null || activeGroup !== null;
 
   return (
@@ -274,7 +273,57 @@ export function Library({ onShowStats, onShowSync }: { onShowStats?: () => void;
           </button>
         </div>
 
-        {!sidebarCollapsed && (
+        {sidebarCollapsed ? (
+          <div className="flex-1 overflow-y-auto py-2 flex flex-col items-center gap-1">
+            {/* Collapsed icon shortcuts */}
+            <SidebarIcon
+              icon={<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
+                <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
+              </svg>}
+              label="全部书籍"
+              active={!hasActiveFilter}
+              onClick={clearFilter}
+            />
+            <SidebarIcon
+              icon={<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
+              </svg>}
+              label="收藏"
+              active={false}
+              onClick={() => {
+                setActiveTag(null);
+                setActiveGroup(null);
+                loadBooks({ starred: true });
+              }}
+            />
+            <div className="w-6 h-px my-1" style={{ background: "var(--border)" }} />
+            {/* Tag icons */}
+            {tags.slice(0, 8).map((tag) => (
+              <SidebarIcon
+                key={tag.id}
+                icon={<div className="w-3 h-3 rounded-full" style={{ background: tag.color }} />}
+                label={tag.name}
+                active={activeTag === tag.name}
+                onClick={() => setActiveTag(activeTag === tag.name ? null : tag.name)}
+              />
+            ))}
+            {tags.length > 8 && (
+              <span className="text-[10px] mt-0.5" style={{ color: "var(--text-tertiary)" }}>+{tags.length - 8}</span>
+            )}
+            <div className="w-6 h-px my-1" style={{ background: "var(--border)" }} />
+            {/* Group icons */}
+            {groups.slice(0, 6).map((group) => (
+              <SidebarIcon
+                key={group.id}
+                icon={<span className="text-sm">{group.icon || "📁"}</span>}
+                label={group.name}
+                active={activeGroup === group.id}
+                onClick={() => setActiveGroup(activeGroup === group.id ? null : group.id)}
+              />
+            ))}
+          </div>
+        ) : (
           <div className="flex-1 overflow-y-auto px-2 pb-4">
             {/* Fixed nav items */}
             <div className="mb-4">
@@ -842,6 +891,39 @@ function SidebarItem({
         </button>
       )}
     </div>
+  );
+}
+
+// Collapsed sidebar icon component
+function SidebarIcon({
+  icon,
+  label,
+  active,
+  onClick,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  active: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      className="w-9 h-9 rounded-lg flex items-center justify-center transition-all"
+      style={{
+        background: active ? "var(--accent-soft)" : "transparent",
+        color: active ? "var(--accent)" : "var(--text-tertiary)",
+      }}
+      onClick={onClick}
+      title={label}
+      onMouseEnter={(e) => {
+        if (!active) e.currentTarget.style.background = "var(--bg-tertiary)";
+      }}
+      onMouseLeave={(e) => {
+        if (!active) e.currentTarget.style.background = "transparent";
+      }}
+    >
+      {icon}
+    </button>
   );
 }
 

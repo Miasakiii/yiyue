@@ -38,6 +38,7 @@ interface AppState {
   setFilter: (filter: BookFilter) => void;
   setViewMode: (mode: "grid" | "list") => void;
   openBook: (bookId: string) => Promise<void>;
+  closeBook: () => void;
   loadChapter: (chapterId: string) => Promise<string>;
   updateProgress: (bookId: string, progress: UpdateProgress) => Promise<void>;
   toggleFavorite: (bookId: string) => Promise<void>;
@@ -79,7 +80,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   groups: [],
   activeTag: null,
   activeGroup: null,
-  theme: "light",
+  theme: (localStorage.getItem("reader-theme") as "light" | "dark" | "sepia") || "light",
 
   loadBooks: async (filter?: BookFilter) => {
     set({ loading: true });
@@ -128,6 +129,10 @@ export const useAppStore = create<AppState>((set, get) => ({
       // Show error to user
       alert(`打开书籍失败: ${msg}`);
     }
+  },
+
+  closeBook: () => {
+    set({ currentBook: null, chapters: [], currentChapter: null, progress: null });
   },
 
   loadChapter: async (chapterId: string) => {
@@ -188,7 +193,9 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   setTheme: (theme: "light" | "dark" | "sepia") => {
-    document.documentElement.className = theme === "light" ? "" : theme;
+    document.documentElement.classList.remove("dark", "sepia");
+    if (theme !== "light") document.documentElement.classList.add(theme);
+    localStorage.setItem("reader-theme", theme);
     set({ theme });
   },
 
@@ -213,15 +220,13 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   deleteTag: async (id: string) => {
     try {
+      // Look up tag name before deletion to avoid stale state
+      const tagName = get().tags.find((t) => t.id === id)?.name;
       await invoke("delete_tag", { id });
       get().loadTags();
-      // If the deleted tag was active, clear the filter
-      if (get().activeTag) {
-        const tag = get().tags.find((t) => t.id === id);
-        if (tag && tag.name === get().activeTag) {
-          set({ activeTag: null });
-          get().loadBooks({ ...get().filter, tag: undefined });
-        }
+      if (tagName && get().activeTag === tagName) {
+        set({ activeTag: null });
+        get().loadBooks({ ...get().filter, tag: undefined });
       }
     } catch (e) {
       console.error("Failed to delete tag:", e);

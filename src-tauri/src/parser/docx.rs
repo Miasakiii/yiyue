@@ -122,17 +122,16 @@ fn split_by_headings(paragraphs: &[(String, bool)]) -> Vec<ParsedChapter> {
         if *is_heading && !current_lines.is_empty() {
             // Flush previous chapter
             let content = current_lines.join("\n");
-            let content_len = content.len();
             let char_count = content.chars().count();
             chapters.push(ParsedChapter {
                 title: current_title.clone(),
                 level: 1,
                 start_offset: offset,
-                end_offset: offset + content_len,
+                end_offset: offset + char_count,
                 char_count,
                 content,
             });
-            offset += content_len + 1; // +1 for newline separator
+            offset += char_count + 1; // +1 for newline separator
             current_lines.clear();
             current_title = text.clone();
         } else {
@@ -143,13 +142,12 @@ fn split_by_headings(paragraphs: &[(String, bool)]) -> Vec<ParsedChapter> {
     // Flush last chapter
     if !current_lines.is_empty() {
         let content = current_lines.join("\n");
-        let content_len = content.len();
         let char_count = content.chars().count();
         chapters.push(ParsedChapter {
             title: current_title,
             level: 1,
             start_offset: offset,
-            end_offset: offset + content_len,
+            end_offset: offset + char_count,
             char_count,
             content,
         });
