@@ -159,6 +159,19 @@ pub fn initialize(conn: &Connection) -> Result<(), rusqlite::Error> {
             key   TEXT PRIMARY KEY,
             value TEXT NOT NULL
         );
+
+        CREATE TABLE IF NOT EXISTS reading_profiles (
+            book_id       TEXT PRIMARY KEY REFERENCES books(id) ON DELETE CASCADE,
+            font_size     INTEGER DEFAULT 18,
+            line_height   REAL DEFAULT 1.8,
+            font_family   TEXT DEFAULT 'default',
+            content_width TEXT DEFAULT 'medium',
+            paragraph_spacing REAL DEFAULT 0.8,
+            text_align    TEXT DEFAULT 'left',
+            page_animation TEXT DEFAULT 'none',
+            created_at    TEXT NOT NULL DEFAULT (datetime('now')),
+            updated_at    TEXT NOT NULL DEFAULT (datetime('now'))
+        );
         ",
     )?;
 
@@ -180,4 +193,85 @@ pub fn initialize(conn: &Connection) -> Result<(), rusqlite::Error> {
     )?;
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_initialize_creates_all_tables() {
+        let conn = Connection::open_in_memory().unwrap();
+        initialize(&conn).unwrap();
+
+        // Verify all core tables exist
+        let tables: Vec<String> = conn
+            .prepare("SELECT name FROM sqlite_master WHERE type='table' ORDER BY name")
+            .unwrap()
+            .query_map([], |row| row.get(0))
+            .unwrap()
+            .filter_map(|r| r.ok())
+            .collect();
+
+        let expected = [
+            "annotations", "book_groups", "book_tags", "books", "chapters",
+            "favorites", "groups", "reading_progress", "reading_sessions",
+            "rule_groups", "rules", "settings", "sync_log", "tags",
+        ];
+        for table in &expected {
+            assert!(tables.contains(&table.to_string()), "Missing table: {}", table);
+        }
+    }
+
+    #[test]
+    fn test_initialize_creates_fts_tables() {
+        let conn = Connection::open_in_memory().unwrap();
+        initialize(&conn).unwrap();
+
+        // Verify FTS5 virtual tables exist
+        let fts_tables: Vec<String> = conn
+            .prepare("SELECT name FROM sqlite_master WHERE type='table' AND sql LIKE '%fts5%'")
+            .unwrap()
+            .query_map([], |row| row.get(0))
+            .unwrap()
+            .filter_map(|r| r.ok())
+            .collect();
+
+        assert!(fts_tables.contains(&"books_fts".to_string()));
+        assert!(fts_tables.contains(&"annotations_fts".to_string()));
+        assert!(fts_tables.contains(&"chapters_fts".to_string()));
+    }
+
+    #[test]
+    fn test_initialize_idempotent() {
+        let conn = Connection::open_in_memory().unwrap();
+        // Should not fail on second call (CREATE IF NOT EXISTS)
+        initialize(&conn).unwrap();
+        initialize(&conn).unwrap();
+    }
+
+    #[test]
+    fn test_foreign_keys_enforced() {
+        let conn = Connection::open_in_memory().unwrap();
+        initialize(&conn).unwrap();
+
+        // Insert a book first
+        conn.execute(
+            "INSERT INTO books (id, kind, title, file_hash, file_path, file_size, format) VALUES ('b1', 'novel', 'Test', 'hash1', 'path1', 100, 'txt')",
+            [],
+        ).unwrap();
+
+        // Insert chapter with valid FK should work
+        conn.execute(
+            "INSERT INTO chapters (id, book_id, title, sort_order) VALUES ('c1', 'b1', 'Ch1', 0)",
+            [],
+        ).unwrap();
+
+        // Insert chapter with invalid FK should fail
+        let result = conn.execute(
+            "INSERT INTO chapters (id, book_id, title, sort_order) VALUES ('c2', 'nonexistent', 'Ch2', 1)",
+            [],
+        );
+        assert!(result.is_err(), "Foreign key constraint should reject invalid book_id");
+    }
 }

@@ -132,3 +132,26 @@ pub struct ComicMetadata {
     pub reading_direction: String,  // "ltr" | "rtl"
     pub page_scaling: String,       // "fit_width" | "fit_height" | "fit_screen" | "original"
 }
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ReadingProfile {
+    pub book_id: String,
+    pub font_size: i64,
+    pub line_height: f64,
+    pub font_family: String,
+    pub content_width: String,
+    pub paragraph_spacing: f64,
+    pub text_align: String,
+    pub page_animation: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SaveReadingProfile {
+    pub font_size: Option<i64>,
+    pub line_height: Option<f64>,
+    pub font_family: Option<String>,
+    pub content_width: Option<String>,
+    pub paragraph_spacing: Option<f64>,
+    pub text_align: Option<String>,
+    pub page_animation: Option<String>,
+}

@@ -89,3 +89,62 @@ pub fn web_novel_cleaner() -> RuleSet {
         ],
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::rules::apply_rules;
+
+    #[test]
+    fn test_web_novel_cleaner_removes_urls() {
+        let rules = web_novel_cleaner().rules;
+        let text = "正文内容请访问https://www.example.com查看更多";
+        let (result, _) = apply_rules(text, &rules);
+        assert!(!result.contains("https://www.example.com"));
+        assert!(result.contains("正文内容"));
+    }
+
+    #[test]
+    fn test_web_novel_cleaner_removes_watermarks() {
+        let rules = web_novel_cleaner().rules;
+        let text = "这是正文笔趣阁www.biquge.com还有更多内容";
+        let (result, _) = apply_rules(text, &rules);
+        assert!(!result.contains("笔趣阁"));
+        assert!(result.contains("这是正文"));
+    }
+
+    #[test]
+    fn test_web_novel_cleaner_removes_ads() {
+        let rules = web_novel_cleaner().rules;
+        let text = "章节内容最新章节请访问qidian.com阅读体验";
+        let (result, _) = apply_rules(text, &rules);
+        assert!(!result.contains("最新章节"));
+        assert!(result.contains("章节内容"));
+    }
+
+    #[test]
+    fn test_web_novel_cleaner_removes_garbled() {
+        let rules = web_novel_cleaner().rules;
+        let text = "正常文字\x00\x01\x02继续阅读";
+        let (result, _) = apply_rules(text, &rules);
+        assert!(!result.contains('\x00'));
+        assert!(result.contains("正常文字"));
+        assert!(result.contains("继续阅读"));
+    }
+
+    #[test]
+    fn test_web_novel_cleaner_merges_blank_lines() {
+        let rules = web_novel_cleaner().rules;
+        let text = "段落一\n\n\n\n\n段落二";
+        let (result, _) = apply_rules(text, &rules);
+        assert_eq!(result, "段落一\n\n段落二");
+    }
+
+    #[test]
+    fn test_web_novel_cleaner_preserves_normal_text() {
+        let rules = web_novel_cleaner().rules;
+        let text = "这是一段完全正常的中文小说内容，不应该被修改。";
+        let (result, _) = apply_rules(text, &rules);
+        assert_eq!(result, text);
+    }
+}

@@ -1,5 +1,6 @@
 pub mod annotations;
 pub mod books;
+pub mod dict;
 pub mod export;
 pub mod import;
 pub mod search;

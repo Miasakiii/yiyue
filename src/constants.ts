@@ -17,4 +17,4 @@ export const THEMES = [
 ];
 
 /** Supported import file extensions */
-export const SUPPORTED_EXTENSIONS = ["txt", "epub", "pdf", "md", "markdown", "cbz", "docx"];
+export const SUPPORTED_EXTENSIONS = ["txt", "epub", "pdf", "md", "markdown", "cbz", "cbr", "docx"];

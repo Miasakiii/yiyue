@@ -101,3 +101,24 @@ export interface ComicPage {
   height: number;
   image_path: string; // Path to extracted/cached image
 }
+
+export interface ReadingProfile {
+  book_id: string;
+  font_size: number;
+  line_height: number;
+  font_family: string;
+  content_width: string;
+  paragraph_spacing: number;
+  text_align: string;
+  page_animation: string;
+}
+
+export interface SaveReadingProfile {
+  font_size?: number;
+  line_height?: number;
+  font_family?: string;
+  content_width?: string;
+  paragraph_spacing?: number;
+  text_align?: string;
+  page_animation?: string;
+}

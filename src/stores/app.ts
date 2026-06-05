@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { invoke } from "@tauri-apps/api/core";
+import { showToast } from "../components/Toast";
 import type {
   Book,
   BookListItem,
@@ -9,6 +10,8 @@ import type {
   UpdateProgress,
   Tag,
   Group,
+  ReadingProfile,
+  SaveReadingProfile,
 } from "../types";
 
 interface AppState {
@@ -23,6 +26,7 @@ interface AppState {
   chapters: Chapter[];
   currentChapter: Chapter | null;
   progress: ReadingProgress | null;
+  readingProfile: ReadingProfile | null;
 
   // Tags & Groups
   tags: Tag[];
@@ -45,6 +49,10 @@ interface AppState {
   deleteBook: (bookId: string) => Promise<void>;
   importBook: (filePath: string, encoding?: string) => Promise<Book>;
   setTheme: (theme: "light" | "dark" | "sepia") => void;
+
+  // Reading profile actions
+  loadReadingProfile: (bookId: string) => Promise<void>;
+  saveReadingProfile: (bookId: string, profile: SaveReadingProfile) => Promise<void>;
 
   // Tag actions
   loadTags: () => Promise<void>;
@@ -71,11 +79,12 @@ export const useAppStore = create<AppState>((set, get) => ({
   books: [],
   loading: false,
   filter: {},
-  viewMode: "grid",
+  viewMode: (localStorage.getItem("reader-view-mode") as "grid" | "list") || "grid",
   currentBook: null,
   chapters: [],
   currentChapter: null,
   progress: null,
+  readingProfile: null,
   tags: [],
   groups: [],
   activeTag: null,
@@ -101,6 +110,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   setViewMode: (mode: "grid" | "list") => {
+    localStorage.setItem("reader-view-mode", mode);
     set({ viewMode: mode });
   },
 
@@ -111,8 +121,11 @@ export const useAppStore = create<AppState>((set, get) => ({
       const progress = await invoke<ReadingProgress | null>("get_progress", {
         bookId,
       });
+      const profile = await invoke<ReadingProfile | null>("get_reading_profile", {
+        bookId,
+      });
 
-      set({ currentBook: book, chapters, progress });
+      set({ currentBook: book, chapters, progress, readingProfile: profile });
 
       // Load the current chapter — always resolve to a valid chapter
       let chapter: Chapter | undefined;
@@ -126,13 +139,12 @@ export const useAppStore = create<AppState>((set, get) => ({
     } catch (e: any) {
       const msg = e?.toString() || String(e);
       console.error("Failed to open book:", e);
-      // Show error to user
-      alert(`打开书籍失败: ${msg}`);
+      showToast(`打开书籍失败: ${msg}`, "error");
     }
   },
 
   closeBook: () => {
-    set({ currentBook: null, chapters: [], currentChapter: null, progress: null });
+    set({ currentBook: null, chapters: [], currentChapter: null, progress: null, readingProfile: null });
   },
 
   loadChapter: async (chapterId: string) => {
@@ -197,6 +209,31 @@ export const useAppStore = create<AppState>((set, get) => ({
     if (theme !== "light") document.documentElement.classList.add(theme);
     localStorage.setItem("reader-theme", theme);
     set({ theme });
+  },
+
+  // Reading profile actions
+  loadReadingProfile: async (bookId: string) => {
+    try {
+      const profile = await invoke<ReadingProfile | null>("get_reading_profile", {
+        bookId,
+      });
+      set({ readingProfile: profile });
+    } catch (e) {
+      console.error("Failed to load reading profile:", e);
+    }
+  },
+
+  saveReadingProfile: async (bookId: string, profile: SaveReadingProfile) => {
+    try {
+      await invoke("save_reading_profile", { bookId, profile });
+      // Reload the profile to get the updated state
+      const updated = await invoke<ReadingProfile | null>("get_reading_profile", {
+        bookId,
+      });
+      set({ readingProfile: updated });
+    } catch (e) {
+      console.error("Failed to save reading profile:", e);
+    }
   },
 
   // Tag actions

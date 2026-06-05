@@ -184,6 +184,11 @@ pub async fn import_book(
                     .map_err(|e| e.to_string())?;
                 Ok(ParsedImport::Comic { comic })
             }
+            "cbr" => {
+                let comic = parser::comic::parse_cbr(&path, &comic_cache_dir)
+                    .map_err(|e| e.to_string())?;
+                Ok(ParsedImport::Comic { comic })
+            }
             _ => Err(format!("Unsupported format: {}", format)),
         }
     })

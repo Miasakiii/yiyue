@@ -6,6 +6,7 @@ import { ComicReader } from "./pages/ComicReader";
 import { Stats } from "./pages/Stats";
 import { SyncSettings } from "./pages/SyncSettings";
 import { SearchPanel } from "./components/SearchPanel";
+import { ToastContainer } from "./components/Toast";
 import "./App.css";
 
 type Page = "library" | "reader" | "stats" | "sync";
@@ -37,9 +38,15 @@ function App() {
         setShowSearch((s) => !s);
       }
     };
-
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
+  }, []);
+
+  // Listen for open-search event from Reader (Ctrl+F)
+  useEffect(() => {
+    const handleOpenSearch = () => setShowSearch(true);
+    window.addEventListener("open-search", handleOpenSearch);
+    return () => window.removeEventListener("open-search", handleOpenSearch);
   }, []);
 
   // Auto-navigate to reader when book is opened, back to library when closed
@@ -99,6 +106,7 @@ function App() {
         visible={showSearch}
         onClose={() => setShowSearch(false)}
       />
+      <ToastContainer />
     </>
   );
 }

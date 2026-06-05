@@ -5,6 +5,8 @@ import { HighlightPopover } from "../components/HighlightPopover";
 import { NotePanel } from "../components/NotePanel";
 import { THEMES } from "../constants";
 import { useFullscreen } from "../hooks/useFullscreen";
+import { showToast } from "../components/Toast";
+import type { SaveReadingProfile } from "../types";
 
 /* ---------- Reading settings helpers ---------- */
 const FONT_FAMILIES = [
@@ -25,14 +27,15 @@ const CONTENT_WIDTH_PRESETS = [
 /* ---------- Component ---------- */
 export function Reader() {
   const {
-    currentBook, chapters, currentChapter, progress,
-    updateProgress, loadChapter, theme, setTheme,
+    currentBook, chapters, currentChapter, progress, readingProfile,
+    updateProgress, loadChapter, theme, setTheme, saveReadingProfile,
   } = useAppStore();
 
   const [content, setContent] = useState("");
   const [loading, setLoading] = useState(false);
+  const [charsPerMinute, setCharsPerMinute] = useState(300);
 
-  // Persisted reading settings
+  // Reading settings — initialized from localStorage (global defaults)
   const [fontSize, setFontSize] = useState(
     () => Number(localStorage.getItem("reader-font-size")) || 18
   );
@@ -51,6 +54,26 @@ export function Reader() {
   const [textAlign, setTextAlign] = useState<"left" | "justify">(
     () => (localStorage.getItem("reader-text-align") as "left" | "justify") || "left"
   );
+  const [pageAnimation, setPageAnimation] = useState(
+    () => localStorage.getItem("reader-page-animation") || "none"
+  );
+  const [animClass, setAnimClass] = useState("");
+  const prevChapterRef = useRef<string | null>(null);
+
+  // Apply per-book reading profile when it changes (overrides localStorage defaults)
+  useEffect(() => {
+    if (readingProfile) {
+      setFontSize(readingProfile.font_size);
+      setLineHeight(readingProfile.line_height);
+      setFontFamilyKey(readingProfile.font_family);
+      setContentWidthKey(readingProfile.content_width);
+      setParagraphSpacing(readingProfile.paragraph_spacing);
+      setTextAlign(readingProfile.text_align as "left" | "justify");
+      if (readingProfile.page_animation && readingProfile.page_animation !== "none") {
+        setPageAnimation(readingProfile.page_animation);
+      }
+    }
+  }, [readingProfile]);
 
   const [showSidebar, setShowSidebar] = useState(false);
   const [showNotes, setShowNotes] = useState(false);
@@ -65,13 +88,34 @@ export function Reader() {
     FONT_FAMILIES.find((f) => f.key === fontFamilyKey)?.value ??
     FONT_FAMILIES[0].value;
 
-  /* ---- Persist reading settings ---- */
+  /* ---- Persist reading settings (localStorage + per-book backend) ---- */
   useEffect(() => { localStorage.setItem("reader-font-size", String(fontSize)); }, [fontSize]);
   useEffect(() => { localStorage.setItem("reader-line-height", String(lineHeight)); }, [lineHeight]);
   useEffect(() => { localStorage.setItem("reader-font-family", fontFamilyKey); }, [fontFamilyKey]);
   useEffect(() => { localStorage.setItem("reader-content-width", contentWidthKey); }, [contentWidthKey]);
   useEffect(() => { localStorage.setItem("reader-paragraph-spacing", String(paragraphSpacing)); }, [paragraphSpacing]);
   useEffect(() => { localStorage.setItem("reader-text-align", textAlign); }, [textAlign]);
+  useEffect(() => { localStorage.setItem("reader-page-animation", pageAnimation); }, [pageAnimation]);
+
+  // Debounced save to per-book reading profile in backend
+  const saveTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  useEffect(() => {
+    if (!currentBook) return;
+    if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+    saveTimerRef.current = setTimeout(() => {
+      const profile: SaveReadingProfile = {
+        font_size: fontSize,
+        line_height: lineHeight,
+        font_family: fontFamilyKey,
+        content_width: contentWidthKey,
+        paragraph_spacing: paragraphSpacing,
+        text_align: textAlign,
+        page_animation: pageAnimation,
+      };
+      saveReadingProfile(currentBook.id, profile);
+    }, 500);
+    return () => { if (saveTimerRef.current) clearTimeout(saveTimerRef.current); };
+  }, [fontSize, lineHeight, fontFamilyKey, contentWidthKey, paragraphSpacing, textAlign, currentBook]);
 
   const contentWidth = CONTENT_WIDTH_PRESETS.find((w) => w.key === contentWidthKey)?.value ?? 640;
 
@@ -111,6 +155,36 @@ export function Reader() {
       }
     };
   }, [currentBook]);
+
+  /* ---- Load reading speed for time estimate ---- */
+  useEffect(() => {
+    if (!currentBook) return;
+    invoke<{ chars_per_minute: number }>("get_reading_speed", { bookId: currentBook.id })
+      .then((speed) => setCharsPerMinute(speed.chars_per_minute))
+      .catch(() => setCharsPerMinute(300));
+  }, [currentBook]);
+
+  /* ---- Trigger page animation on chapter change ---- */
+  useEffect(() => {
+    if (!currentChapter || !prevChapterRef.current || pageAnimation === "none") {
+      prevChapterRef.current = currentChapter?.id ?? null;
+      return;
+    }
+    if (currentChapter.id !== prevChapterRef.current) {
+      // Determine direction: find index of old vs new chapter
+      const oldIdx = chapters.findIndex(c => c.id === prevChapterRef.current);
+      const newIdx = chapters.findIndex(c => c.id === currentChapter.id);
+      const direction = newIdx > oldIdx ? "forward" : "backward";
+      const cls = pageAnimation === "fade"
+        ? "page-anim-fade"
+        : direction === "forward" ? "page-anim-slide-left" : "page-anim-slide-right";
+      setAnimClass(cls);
+      // Remove animation class after it completes
+      const timer = setTimeout(() => setAnimClass(""), 350);
+      prevChapterRef.current = currentChapter.id;
+      return () => clearTimeout(timer);
+    }
+  }, [currentChapter, pageAnimation, chapters]);
 
   /* ---- Load chapter content ---- */
   useEffect(() => {
@@ -173,6 +247,27 @@ export function Reader() {
       } else if (e.key === "n" && (e.ctrlKey || e.metaKey)) {
         e.preventDefault();
         setShowNotes((s) => !s);
+      } else if (e.key === "d" && (e.ctrlKey || e.metaKey)) {
+        // Ctrl+D: toggle favorite / bookmark
+        e.preventDefault();
+        if (currentBook) {
+          useAppStore.getState().toggleFavorite(currentBook.id);
+          showToast("已切换收藏状态", "success");
+        }
+      } else if (e.key === "g" && (e.ctrlKey || e.metaKey)) {
+        // Ctrl+G: open sidebar for chapter jump
+        e.preventDefault();
+        setShowSidebar(true);
+      } else if (e.key === "f" && (e.ctrlKey || e.metaKey) && !e.shiftKey) {
+        // Ctrl+F: search current book (dispatch global search event)
+        e.preventDefault();
+        window.dispatchEvent(new CustomEvent("open-search"));
+      } else if (e.key === "Escape") {
+        // Escape: close open panels
+        e.preventDefault();
+        if (settingsOpen) setSettingsOpen(false);
+        else if (showNotes) setShowNotes(false);
+        else if (showSidebar) setShowSidebar(false);
       } else if (e.key === "F11") {
         e.preventDefault();
         toggleFullscreen();
@@ -180,7 +275,7 @@ export function Reader() {
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [currentChapter, chapters, toggleFullscreen]);
+  }, [currentChapter, chapters, toggleFullscreen, settingsOpen, showNotes, showSidebar, currentBook]);
 
   /* ---- Restore scroll position ---- */
   useEffect(() => {
@@ -437,6 +532,25 @@ export function Reader() {
                       ))}
                     </div>
                   </SettingRow>
+
+                  {/* Page animation */}
+                  <SettingRow label="翻页">
+                    <div className="flex gap-1">
+                      {[
+                        { key: "none", label: "无" },
+                        { key: "fade", label: "淡入" },
+                        { key: "slide", label: "滑动" },
+                      ].map((a) => (
+                        <button key={a.key} className="px-1.5 py-1 rounded-md text-xs"
+                          style={{
+                            background: pageAnimation === a.key ? "var(--accent-soft)" : "var(--bg-tertiary)",
+                            color: pageAnimation === a.key ? "var(--accent)" : "var(--text-tertiary)",
+                            fontWeight: pageAnimation === a.key ? 600 : 400,
+                          }}
+                          onClick={() => setPageAnimation(a.key)}>{a.label}</button>
+                      ))}
+                    </div>
+                  </SettingRow>
                 </div>
               )}
             </div>
@@ -479,7 +593,7 @@ export function Reader() {
               </div>
             </div>
           ) : (
-            <article className="mx-auto px-8 py-12"
+            <article className={`mx-auto px-8 py-12 ${animClass}`}
               style={{
                 fontSize: `${fontSize}px`, lineHeight, fontFamily,
                 maxWidth: `${contentWidth}px`, textAlign,
@@ -552,11 +666,27 @@ export function Reader() {
         <footer className="flex items-center justify-between px-5 py-2 flex-shrink-0"
           style={{ borderTop: "1px solid var(--border)", background: "var(--bg-secondary)" }}>
           <div className="flex items-center gap-4">
-            <span className="text-xs" style={{ color: "var(--text-tertiary)" }}>{currentChapter.title}</span>
+            <span className="text-xs" style={{ color: "var(--text-tertiary)" }}>
+              第 {chapterIndex + 1}/{chapters.length} 章
+            </span>
+            <span className="text-xs" style={{ color: "var(--text-tertiary)" }}>
+              {currentChapter.title}
+            </span>
+            {(() => {
+              const chapterChars = currentChapter.char_count ?? 0;
+              const readRatio = progress?.chapter_id === currentChapter.id ? (progress.scroll_offset ?? 0) : 0;
+              const remainingChars = Math.max(0, chapterChars * (1 - readRatio));
+              const remainingMin = Math.max(1, Math.round(remainingChars / charsPerMinute));
+              return chapterChars > 0 ? (
+                <span className="text-xs" style={{ color: "var(--text-tertiary)" }}>
+                  约剩 {remainingMin} 分钟
+                </span>
+              ) : null;
+            })()}
           </div>
           <div className="flex items-center gap-4">
             <span className="text-xs tabular-nums" style={{ color: "var(--text-tertiary)" }}>
-              {currentBook.total_chars?.toLocaleString() || "?"} chars
+              {currentBook.total_chars?.toLocaleString() || "?"} 字
             </span>
             <div className="w-20 h-1 rounded-full overflow-hidden" style={{ background: "var(--bg-tertiary)" }}>
               <div className="h-full rounded-full transition-all" style={{ width: `${progressPct}%`, background: "var(--accent)" }} />

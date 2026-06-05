@@ -1,7 +1,7 @@
 use crate::models::{ComicChapter, ComicMetadata, ComicPage};
 use std::fs;
 use std::io::Read;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 const IMAGE_EXTENSIONS: &[&str] = &["jpg", "jpeg", "png", "webp", "gif", "bmp", "tiff"];
 
@@ -18,7 +18,12 @@ fn natural_sort_key(s: &str) -> Vec<String> {
     for c in s.chars() {
         if c.is_ascii_digit() != in_digit {
             if !current.is_empty() {
-                parts.push(current.clone());
+                // Zero-pad numeric parts so string comparison gives numeric ordering
+                if in_digit {
+                    parts.push(format!("{:0>20}", current));
+                } else {
+                    parts.push(current.clone());
+                }
                 current.clear();
             }
             in_digit = c.is_ascii_digit();
@@ -26,7 +31,11 @@ fn natural_sort_key(s: &str) -> Vec<String> {
         current.push(c);
     }
     if !current.is_empty() {
-        parts.push(current);
+        if in_digit {
+            parts.push(format!("{:0>20}", current));
+        } else {
+            parts.push(current);
+        }
     }
     parts
 }
@@ -210,6 +219,124 @@ pub fn parse_folder(folder_path: &Path, cache_dir: &Path) -> Result<ParsedComic,
     let reading_mode = if avg_ratio > 2.0 { "webtoon" } else { "page" };
 
     let title = folder_path
+        .file_stem()
+        .and_then(|s| s.to_str())
+        .unwrap_or("Untitled")
+        .to_string();
+
+    let chapter = ComicChapter {
+        id: uuid::Uuid::new_v4().to_string(),
+        title: title.clone(),
+        pages,
+        sort_order: 0,
+    };
+
+    Ok(ParsedComic {
+        metadata: ComicMetadata {
+            title,
+            author: None,
+            language: "unknown".to_string(),
+            total_pages: chapter.pages.len() as i64,
+            reading_mode: reading_mode.to_string(),
+            reading_direction: "ltr".to_string(),
+            page_scaling: "fit_width".to_string(),
+        },
+        chapters: vec![chapter],
+        cover_path,
+    })
+}
+
+/// Parse a CBR (RAR) file. Extracts images to cache directory.
+pub fn parse_cbr(cbr_path: &Path, cache_dir: &Path) -> Result<ParsedComic, String> {
+    let book_hash = {
+        let data = fs::read(cbr_path).map_err(|e| format!("Failed to read CBR: {}", e))?;
+        blake3::hash(&data).to_hex().to_string()
+    };
+
+    let book_cache_dir = cache_dir.join(&book_hash[..2]).join(&book_hash);
+    fs::create_dir_all(&book_cache_dir).map_err(|e| e.to_string())?;
+
+    // Extract RAR entries to cache directory
+    let mut archive = unrar::Archive::new(cbr_path)
+        .open_for_processing()
+        .map_err(|e| format!("Failed to open CBR: {}", e))?;
+
+    let mut image_entries: Vec<(String, PathBuf)> = Vec::new();
+
+    while let Some(header) = archive
+        .read_header()
+        .map_err(|e| format!("Failed to read CBR header: {}", e))?
+    {
+        let filename = header.entry().filename.to_string_lossy().to_string();
+        if header.entry().is_file() && is_image(&filename) && !filename.starts_with("__MACOSX") {
+            let ext = Path::new(&filename)
+                .extension()
+                .and_then(|e| e.to_str())
+                .unwrap_or("jpg");
+            let index = image_entries.len();
+            let cached_name = format!("{:04}.{}", index, ext);
+            let cached_path = book_cache_dir.join(&cached_name);
+
+            archive = header
+                .extract_to(&cached_path)
+                .map_err(|e| format!("Failed to extract CBR entry '{}': {}", filename, e))?;
+
+            image_entries.push((filename, cached_path));
+        } else {
+            archive = header
+                .skip()
+                .map_err(|e| format!("Failed to skip CBR entry: {}", e))?;
+        }
+    }
+
+    // Natural sort by filename
+    image_entries.sort_by(|a, b| {
+        let ka = natural_sort_key(&a.0);
+        let kb = natural_sort_key(&b.0);
+        ka.cmp(&kb)
+    });
+
+    if image_entries.is_empty() {
+        return Err("No images found in CBR file".to_string());
+    }
+
+    // Rename files to match sorted order and build pages
+    let mut pages = Vec::new();
+    let mut cover_path = None;
+
+    for (page_index, (name, cached_path)) in image_entries.iter().enumerate() {
+        let buffer = fs::read(cached_path).map_err(|e| e.to_string())?;
+        let (width, height) = get_image_dimensions(&buffer);
+
+        let ext = cached_path
+            .extension()
+            .and_then(|e| e.to_str())
+            .unwrap_or("jpg");
+        let sorted_name = format!("{:04}.{}", page_index, ext);
+        let sorted_path = book_cache_dir.join(&sorted_name);
+
+        // Rename if needed (only when order changed)
+        if cached_path != &sorted_path {
+            fs::rename(cached_path, &sorted_path).map_err(|e| e.to_string())?;
+        }
+
+        if page_index == 0 {
+            cover_path = Some(sorted_path.to_string_lossy().to_string());
+        }
+
+        pages.push(ComicPage {
+            index: page_index as i64,
+            file_name: name.clone(),
+            width,
+            height,
+            image_path: sorted_path.to_string_lossy().to_string(),
+        });
+    }
+
+    let avg_ratio = pages.iter().map(|p| p.height as f64 / p.width as f64).sum::<f64>() / pages.len() as f64;
+    let reading_mode = if avg_ratio > 2.0 { "webtoon" } else { "page" };
+
+    let title = cbr_path
         .file_stem()
         .and_then(|s| s.to_str())
         .unwrap_or("Untitled")

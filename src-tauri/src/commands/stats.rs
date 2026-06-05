@@ -234,6 +234,48 @@ pub fn get_book_stats(db: State<'_, DbConn>) -> Result<Vec<BookStats>, String> {
     Ok(result)
 }
 
+#[derive(Debug, Serialize)]
+pub struct ReadingSpeed {
+    pub chars_per_minute: f64,
+}
+
+/// Get reading speed for a book based on recent sessions.
+#[tauri::command]
+pub fn get_reading_speed(
+    db: State<'_, DbConn>,
+    book_id: String,
+) -> Result<ReadingSpeed, String> {
+    let conn = db.conn.lock().map_err(|e| e.to_string())?;
+
+    // Take the most recent 5 sessions for this book
+    let result = conn.query_row(
+        "SELECT COALESCE(SUM(chars_read), 0), COALESCE(SUM(duration_ms), 0)
+         FROM (SELECT chars_read, duration_ms FROM reading_sessions
+               WHERE book_id = ?1 ORDER BY end_time DESC LIMIT 5)",
+        params![book_id],
+        |row| {
+            let chars: i64 = row.get(0)?;
+            let ms: i64 = row.get(1)?;
+            Ok((chars, ms))
+        },
+    );
+
+    match result {
+        Ok((chars, ms)) if ms > 0 => {
+            let cpm = (chars as f64) / (ms as f64) * 60000.0;
+            Ok(ReadingSpeed {
+                chars_per_minute: cpm.max(100.0), // floor at 100 to avoid absurd estimates
+            })
+        }
+        _ => {
+            // No data — default to 300 chars/min (average Chinese reading speed)
+            Ok(ReadingSpeed {
+                chars_per_minute: 300.0,
+            })
+        }
+    }
+}
+
 fn calculate_streaks(dates: &[String]) -> (i64, i64) {
     if dates.is_empty() {
         return (0, 0);

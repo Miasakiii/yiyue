@@ -176,6 +176,34 @@ html {
   animation: scaleIn var(--transition-fast) ease-out;
 }
 
+/* Page turn animations */
+.page-anim-fade {
+  animation: pageFade 300ms ease-out;
+}
+
+.page-anim-slide-left {
+  animation: pageSlideLeft 300ms ease-out;
+}
+
+.page-anim-slide-right {
+  animation: pageSlideRight 300ms ease-out;
+}
+
+@keyframes pageFade {
+  0% { opacity: 0; }
+  100% { opacity: 1; }
+}
+
+@keyframes pageSlideLeft {
+  0% { opacity: 0; transform: translateX(30px); }
+  100% { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes pageSlideRight {
+  0% { opacity: 0; transform: translateX(-30px); }
+  100% { opacity: 1; transform: translateX(0); }
+}
+
 /* Button base styles */
 button {
   cursor: pointer;

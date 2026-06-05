@@ -35,4 +35,6 @@ zip = "2"
 tauri-plugin-dialog = "2.7.1"
 pdf-extract = "0.10.0"
 docx-rs = "0.4"
+unrar = "0.5.8"
+urlencoding = "2.1.3"
 

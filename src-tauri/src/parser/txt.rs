@@ -208,3 +208,77 @@ pub fn parse(file_path: &Path, options: &ParseOptions) -> Result<ParsedDocument,
         full_text: text,
     })
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_detect_encoding_utf8_bom() {
+        let data = b"\xEF\xBB\xBFHello";
+        let enc = detect_encoding(data);
+        assert_eq!(enc, encoding_rs::UTF_8);
+    }
+
+    #[test]
+    fn test_detect_encoding_utf16le_bom() {
+        let data = b"\xFF\xFEH\x00e\x00l\x00l\x00o\x00";
+        let enc = detect_encoding(data);
+        assert_eq!(enc, encoding_rs::UTF_16LE);
+    }
+
+    #[test]
+    fn test_decode_text_utf8() {
+        let raw = "你好世界".as_bytes();
+        let result = decode_text(raw, None).unwrap();
+        assert_eq!(result, "你好世界");
+    }
+
+    #[test]
+    fn test_decode_text_forced_encoding() {
+        // GBK encoding of "你好"
+        let raw = &[0xC4, 0xE3, 0xBA, 0xC3];
+        let result = decode_text(raw, Some("gbk")).unwrap();
+        assert_eq!(result, "你好");
+    }
+
+    #[test]
+    fn test_detect_chapters_chinese() {
+        let text = "第一章 开始\n这是第一章的内容，需要足够长的文本来确保被识别。\n第二章 发展\n这是第二章的内容，也需要足够长的文本来确保。";
+        let chapters = detect_chapters(text);
+        // The chapter regex matches lines starting with 第...章
+        assert!(chapters.len() >= 1, "Expected at least 1 chapter, got {}", chapters.len());
+        assert!(chapters.iter().any(|c| c.title.contains("第一章")));
+    }
+
+    #[test]
+    fn test_detect_chapters_english() {
+        let text = "Chapter 1 Beginning\nThis is the first chapter content with enough text.\nChapter 2 Development\nThis is the second chapter content with enough text.";
+        let chapters = detect_chapters(text);
+        assert!(chapters.len() >= 2, "Expected at least 2 chapters, got {}", chapters.len());
+    }
+
+    #[test]
+    fn test_detect_chapters_no_chapters() {
+        let text = "这是一段没有章节标记的普通文本内容。";
+        let chapters = detect_chapters(text);
+        assert_eq!(chapters.len(), 1);
+        assert_eq!(chapters[0].title, "全文");
+    }
+
+    #[test]
+    fn test_detect_chapters_from_text_offsets() {
+        let text = "第一章 AAA\n内容一\n第二章 BBB\n内容二";
+        let chapters = detect_chapters_from_text(text);
+        // Verify offsets are sequential
+        for i in 1..chapters.len() {
+            assert_eq!(chapters[i].start_offset, chapters[i - 1].end_offset);
+        }
+    }
+
+    #[test]
+    fn test_title_from_path() {
+        let path = Path::new("/some/path/我的小说.txt");
+        assert_eq!(title_from_path(path), "我的小说");
+    }
+}

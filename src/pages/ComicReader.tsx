@@ -10,6 +10,7 @@ export function ComicReader() {
   const [pages, setPages] = useState<ComicPage[]>([]);
   const [currentPage, setCurrentPage] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [doublePage, setDoublePage] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -59,8 +60,20 @@ export function ComicReader() {
     [pages, saveProgress]
   );
 
-  const prevPage = useCallback(() => goToPage(currentPage - 1), [currentPage, goToPage]);
-  const nextPage = useCallback(() => goToPage(currentPage + 1), [currentPage, goToPage]);
+  const prevPage = useCallback(() => {
+    if (doublePage && currentPage > 1) goToPage(currentPage - 2);
+    else goToPage(currentPage - 1);
+  }, [currentPage, goToPage, doublePage]);
+
+  const nextPage = useCallback(() => {
+    // In double-page mode, skip page 1 if cover is single (page 0)
+    if (doublePage) {
+      const step = currentPage === 0 ? 1 : 2;
+      goToPage(Math.min(currentPage + step, pages.length - 1));
+    } else {
+      goToPage(currentPage + 1);
+    }
+  }, [currentPage, goToPage, doublePage, pages.length]);
 
   const toggleFullscreen = useFullscreen();
 
@@ -78,6 +91,9 @@ export function ComicReader() {
       } else if (e.key === "End") {
         e.preventDefault();
         goToPage(pages.length - 1);
+      } else if (e.key === "d" || e.key === "D") {
+        e.preventDefault();
+        setDoublePage((v) => !v);
       } else if (e.key === "F11") {
         e.preventDefault();
         toggleFullscreen();
@@ -153,6 +169,24 @@ export function ComicReader() {
 
           <div className="w-px h-5 mx-1" style={{ background: "var(--border)" }} />
 
+          {/* Double page toggle */}
+          {!isWebtoon && (
+            <button className="px-2 py-1.5 rounded-lg text-xs"
+              style={{
+                background: doublePage ? "var(--accent-soft)" : "transparent",
+                color: doublePage ? "var(--accent)" : "var(--text-tertiary)",
+              }}
+              onClick={() => setDoublePage((v) => !v)}
+              title="双页模式 (D)"
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <rect x="2" y="3" width="8" height="18" rx="1" /><rect x="14" y="3" width="8" height="18" rx="1" />
+              </svg>
+            </button>
+          )}
+
+          <div className="w-px h-5 mx-1" style={{ background: "var(--border)" }} />
+
           {/* Page nav */}
           <button className="px-2 py-1.5 rounded-lg" style={{ color: currentPage > 0 ? "var(--text-secondary)" : "var(--text-tertiary)" }}
             onClick={prevPage} disabled={currentPage === 0}>
@@ -161,7 +195,9 @@ export function ComicReader() {
             </svg>
           </button>
           <span className="text-xs tabular-nums px-2" style={{ color: "var(--text-tertiary)" }}>
-            {currentPage + 1} / {pages.length}
+            {doublePage && currentPage < pages.length - 1
+              ? `${currentPage + 1}-${currentPage + 2}`
+              : currentPage + 1} / {pages.length}
           </span>
           <button className="px-2 py-1.5 rounded-lg" style={{ color: currentPage < pages.length - 1 ? "var(--text-secondary)" : "var(--text-tertiary)" }}
             onClick={nextPage} disabled={currentPage === pages.length - 1}>
@@ -200,6 +236,13 @@ export function ComicReader() {
                   className="w-full" style={{ display: "block" }} />
               ))}
             </div>
+          </div>
+        ) : doublePage && currentPage < pages.length - 1 ? (
+          <div className="flex items-center justify-center h-full gap-1">
+            <img src={`asset://localhost/${pages[currentPage]?.image_path}`} alt={pages[currentPage]?.file_name}
+              className="max-h-full max-w-[50%] object-contain" style={{ userSelect: "none" }} />
+            <img src={`asset://localhost/${pages[currentPage + 1]?.image_path}`} alt={pages[currentPage + 1]?.file_name}
+              className="max-h-full max-w-[50%] object-contain" style={{ userSelect: "none" }} />
           </div>
         ) : (
           <div className="flex items-center justify-center h-full">

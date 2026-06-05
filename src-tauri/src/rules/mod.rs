@@ -69,3 +69,76 @@ pub fn apply_rules(text: &str, rules: &[Rule]) -> (String, usize) {
 
     (result, total_replacements)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn make_rule(id: &str, pattern: &str, replacement: &str, is_regex: bool, enabled: bool, priority: i64) -> Rule {
+        Rule {
+            id: id.to_string(),
+            name: id.to_string(),
+            pattern: pattern.to_string(),
+            replacement: replacement.to_string(),
+            scope: "global".to_string(),
+            is_regex,
+            enabled,
+            priority,
+            group_id: None,
+            description: None,
+        }
+    }
+
+    #[test]
+    fn test_apply_rules_literal_replacement() {
+        let rules = vec![make_rule("1", "bad", "good", false, true, 100)];
+        let (result, count) = apply_rules("this is bad text", &rules);
+        assert_eq!(result, "this is good text");
+        assert!(count > 0);
+    }
+
+    #[test]
+    fn test_apply_rules_regex_replacement() {
+        let rules = vec![make_rule("1", r"\d+", "NUM", true, true, 100)];
+        let (result, _) = apply_rules("abc 123 def 456", &rules);
+        assert_eq!(result, "abc NUM def NUM");
+    }
+
+    #[test]
+    fn test_apply_rules_disabled_rules_skipped() {
+        let rules = vec![make_rule("1", "bad", "good", false, false, 100)];
+        let (result, count) = apply_rules("this is bad text", &rules);
+        assert_eq!(result, "this is bad text");
+        assert_eq!(count, 0);
+    }
+
+    #[test]
+    fn test_apply_rules_priority_ordering() {
+        // Higher priority runs first — "aa" → "bb" → "cc" if priority order matters
+        let rules = vec![
+            make_rule("1", "aa", "bb", false, true, 50),
+            make_rule("2", "bb", "cc", false, true, 100),
+        ];
+        let (result, _) = apply_rules("aa", &rules);
+        // Priority 100 runs first (bb→cc), then 50 (aa→bb)
+        // So "aa" → "aa" (bb→cc doesn't match) → "bb" (aa→bb matches)
+        assert_eq!(result, "bb");
+    }
+
+    #[test]
+    fn test_apply_rules_invalid_regex_no_panic() {
+        let rules = vec![make_rule("1", "[invalid", "x", true, true, 100)];
+        let (result, count) = apply_rules("test [invalid text", &rules);
+        // Invalid regex should be skipped, not panic
+        assert_eq!(result, "test [invalid text");
+        assert_eq!(count, 0);
+    }
+
+    #[test]
+    fn test_apply_rules_empty_text() {
+        let rules = vec![make_rule("1", "x", "y", false, true, 100)];
+        let (result, count) = apply_rules("", &rules);
+        assert_eq!(result, "");
+        assert_eq!(count, 0);
+    }
+}

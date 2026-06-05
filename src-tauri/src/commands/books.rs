@@ -328,3 +328,77 @@ pub fn get_chapter_content(
     )
     .map_err(|e| e.to_string())
 }
+
+#[tauri::command]
+pub fn get_reading_profile(
+    db: State<'_, DbConn>,
+    book_id: String,
+) -> Result<Option<ReadingProfile>, String> {
+    let conn = db.conn.lock().map_err(|e| e.to_string())?;
+    let result = conn.query_row(
+        "SELECT book_id, font_size, line_height, font_family, content_width, paragraph_spacing, text_align, page_animation
+         FROM reading_profiles WHERE book_id = ?1",
+        params![book_id],
+        |row| {
+            Ok(ReadingProfile {
+                book_id: row.get(0)?,
+                font_size: row.get(1)?,
+                line_height: row.get(2)?,
+                font_family: row.get(3)?,
+                content_width: row.get(4)?,
+                paragraph_spacing: row.get(5)?,
+                text_align: row.get(6)?,
+                page_animation: row.get(7)?,
+            })
+        },
+    );
+
+    match result {
+        Ok(p) => Ok(Some(p)),
+        Err(rusqlite::Error::QueryReturnedNoRows) => Ok(None),
+        Err(e) => Err(e.to_string()),
+    }
+}
+
+#[tauri::command]
+pub fn save_reading_profile(
+    db: State<'_, DbConn>,
+    book_id: String,
+    profile: SaveReadingProfile,
+) -> Result<(), String> {
+    let conn = db.conn.lock().map_err(|e| e.to_string())?;
+
+    conn.execute(
+        "INSERT INTO reading_profiles (book_id, font_size, line_height, font_family, content_width, paragraph_spacing, text_align, page_animation)
+         VALUES (?1,
+                 COALESCE(?2, 18),
+                 COALESCE(?3, 1.8),
+                 COALESCE(?4, 'default'),
+                 COALESCE(?5, 'medium'),
+                 COALESCE(?6, 0.8),
+                 COALESCE(?7, 'left'),
+                 COALESCE(?8, 'none'))
+         ON CONFLICT(book_id) DO UPDATE SET
+             font_size = COALESCE(?2, font_size),
+             line_height = COALESCE(?3, line_height),
+             font_family = COALESCE(?4, font_family),
+             content_width = COALESCE(?5, content_width),
+             paragraph_spacing = COALESCE(?6, paragraph_spacing),
+             text_align = COALESCE(?7, text_align),
+             page_animation = COALESCE(?8, page_animation),
+             updated_at = datetime('now')",
+        params![
+            book_id,
+            profile.font_size,
+            profile.line_height,
+            profile.font_family,
+            profile.content_width,
+            profile.paragraph_spacing,
+            profile.text_align,
+            profile.page_animation,
+        ],
+    )
+    .map_err(|e| e.to_string())?;
+
+    Ok(())
+}
