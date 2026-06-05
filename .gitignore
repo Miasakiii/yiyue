@@ -7,6 +7,7 @@ src-tauri/target/
 
 # Planning documents
 FUTURE.md
+TEST_CHECKLIST.md
 STATUS.md
 .ralph/
 
