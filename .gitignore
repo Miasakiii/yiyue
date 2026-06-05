@@ -6,7 +6,7 @@ dist/
 src-tauri/target/
 
 # Planning documents
-PRD.md
+FUTURE.md
 STATUS.md
 .ralph/
 
