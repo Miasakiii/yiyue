@@ -167,11 +167,13 @@ export function NotePanel({
             )}
           </div>
           <button
-            className="text-sm px-2 py-0.5 rounded"
-            style={{ color: "var(--text-secondary)" }}
+            className="px-2 py-1 rounded-lg hover-bg"
+            style={{ color: "var(--text-tertiary)" }}
             onClick={onClose}
           >
-            ✕
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+            </svg>
           </button>
         </div>
       </div>

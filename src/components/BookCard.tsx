@@ -139,7 +139,7 @@ export function BookCard({ book, viewMode }: BookCardProps) {
     return (
       <>
         <div
-          className="flex items-center gap-4 px-4 py-3 rounded-xl cursor-pointer group"
+          className="flex items-center gap-4 px-4 py-3 rounded-xl cursor-pointer group hover-bg"
           style={{
             background: "var(--bg-secondary)",
             border: "1px solid var(--border-light)",
@@ -147,17 +147,7 @@ export function BookCard({ book, viewMode }: BookCardProps) {
           }}
           onClick={() => openBook(book.id)}
           onContextMenu={handleContextMenu}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.background = "var(--bg-tertiary)";
-            e.currentTarget.style.borderColor = "var(--border)";
-            e.currentTarget.style.boxShadow = "var(--shadow-sm)";
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.background = "var(--bg-secondary)";
-            e.currentTarget.style.borderColor = "var(--border-light)";
-            e.currentTarget.style.boxShadow = "none";
-            setShowDeleteConfirm(false);
-          }}
+          onMouseLeave={() => setShowDeleteConfirm(false)}
         >
           {/* Format badge */}
           <div
@@ -180,8 +170,8 @@ export function BookCard({ book, viewMode }: BookCardProps) {
 
           <div className="flex items-center gap-3">
             <div className="flex items-center gap-2">
-              <div className="w-16 h-1.5 rounded-full overflow-hidden" style={{ background: "var(--bg-tertiary)" }}>
-                <div className="h-full rounded-full transition-all" style={{ width: `${progress}%`, background: progress >= 100 ? "#22c55e" : formatColor }} />
+              <div className="w-16 progress-bar">
+                <div className="progress-bar-fill" style={{ width: `${progress}%`, background: progress >= 100 ? "#22c55e" : formatColor }} />
               </div>
               <span className="text-xs w-10 text-right" style={{ color: "var(--text-tertiary)" }}>
                 {formatProgress(progress)}
@@ -314,8 +304,8 @@ export function BookCard({ book, viewMode }: BookCardProps) {
           </div>
           {tagDots}
           <div className="flex items-center gap-2 mt-2">
-            <div className="flex-1 h-1 rounded-full overflow-hidden" style={{ background: "var(--bg-tertiary)" }}>
-              <div className="h-full rounded-full transition-all" style={{ width: `${progress}%`, background: progress >= 100 ? "#22c55e" : formatColor }} />
+            <div className="flex-1 progress-bar">
+              <div className="progress-bar-fill" style={{ width: `${progress}%`, background: progress >= 100 ? "#22c55e" : formatColor }} />
             </div>
             <span className="text-xs flex-shrink-0" style={{ color: "var(--text-tertiary)" }}>
               {formatProgress(progress)}
@@ -368,7 +358,7 @@ function ContextMenu({
         width: menuW,
         background: "var(--bg-elevated)",
         border: "1px solid var(--border)",
-        borderRadius: 10,
+        borderRadius: "var(--radius-md)",
         boxShadow: "var(--shadow-xl)",
         overflow: "hidden",
       }}

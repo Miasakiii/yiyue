@@ -221,15 +221,8 @@ export function SearchPanel({
               {results.map((result, i) => (
                 <button
                   key={`${result.result_type}-${result.id}-${i}`}
-                  className="w-full text-left px-5 py-3 transition-colors"
-                  style={{ background: "transparent" }}
+                  className="w-full text-left px-5 py-3 hover-bg"
                   onClick={() => handleResultClick(result)}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.background = "var(--bg-tertiary)";
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.background = "transparent";
-                  }}
                 >
                   <div className="flex items-start gap-3">
                     <div
@@ -300,15 +293,9 @@ export function SearchPanel({
                 {searchHistory.map((term) => (
                   <button
                     key={term}
-                    className="w-full text-left px-5 py-2.5 text-sm transition-colors flex items-center gap-3"
+                    className="w-full text-left px-5 py-2.5 text-sm hover-bg flex items-center gap-3"
                     style={{ color: "var(--text-secondary)" }}
                     onClick={() => handleHistoryClick(term)}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.background = "var(--bg-tertiary)";
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.background = "transparent";
-                    }}
                   >
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ color: "var(--text-tertiary)" }}>
                       <circle cx="12" cy="12" r="10" />
@@ -335,15 +322,11 @@ export function SearchPanel({
           </span>
           <div className="flex items-center gap-3">
             <span className="flex items-center gap-1">
-              <kbd className="px-1.5 py-0.5 rounded text-xs" style={{ background: "var(--bg-tertiary)", border: "1px solid var(--border)" }}>
-                Ctrl+Shift+F
-              </kbd>
+              <kbd className="kbd">Ctrl+Shift+F</kbd>
               搜索
             </span>
             <span className="flex items-center gap-1">
-              <kbd className="px-1.5 py-0.5 rounded text-xs" style={{ background: "var(--bg-tertiary)", border: "1px solid var(--border)" }}>
-                Esc
-              </kbd>
+              <kbd className="kbd">Esc</kbd>
               关闭
             </span>
           </div>

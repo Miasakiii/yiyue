@@ -234,12 +234,9 @@ export function Stats({ onClose }: { onClose: () => void }) {
                       <div className="flex-1 min-w-0">
                         <div className="text-sm truncate mb-1.5">{book.book_title}</div>
                         <div className="flex items-center gap-3">
-                          <div
-                            className="flex-1 h-1.5 rounded-full overflow-hidden"
-                            style={{ background: "var(--bg-tertiary)" }}
-                          >
+                          <div className="flex-1 progress-bar">
                             <div
-                              className="h-full rounded-full transition-all"
+                              className="progress-bar-fill"
                               style={{
                                 width: `${(book.total_duration_ms / (bookStats[0]?.total_duration_ms || 1)) * 100}%`,
                                 background: i < 3

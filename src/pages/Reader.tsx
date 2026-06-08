@@ -321,7 +321,7 @@ export function Reader() {
       <div className="flex items-center justify-center h-screen" style={{ background: "var(--bg-primary)" }}>
         <div className="flex flex-col items-center gap-3">
           <div className="w-8 h-8 rounded-full border-2 border-t-transparent animate-spin" style={{ borderColor: "var(--accent)", borderTopColor: "transparent" }} />
-          <div className="text-sm" style={{ color: "var(--text-tertiary)" }}>Loading...</div>
+          <div className="text-sm" style={{ color: "var(--text-tertiary)" }}>加载中...</div>
         </div>
       </div>
     );
@@ -334,10 +334,10 @@ export function Reader() {
           <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="var(--text-tertiary)" strokeWidth="1.5">
             <path d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
           </svg>
-          <div className="text-sm" style={{ color: "var(--text-tertiary)" }}>Cannot load chapter content</div>
+          <div className="text-sm" style={{ color: "var(--text-tertiary)" }}>无法加载章节内容</div>
           <button className="px-4 py-1.5 text-xs rounded-lg text-white" style={{ background: "var(--accent)" }}
             onClick={closeBook}>
-            Return to Library
+            返回书库
           </button>
         </div>
       </div>
@@ -368,16 +368,8 @@ export function Reader() {
           }}>
             {chapters.map((ch, i) => (
               <button key={ch.id} data-chapter-id={ch.id}
-                className="w-full text-left px-5 py-2.5 text-sm transition-all"
-                style={{
-                  background: ch.id === currentChapter.id ? "var(--accent-soft)" : "transparent",
-                  color: ch.id === currentChapter.id ? "var(--accent)" : "var(--text-secondary)",
-                  borderLeft: ch.id === currentChapter.id ? "3px solid var(--accent)" : "3px solid transparent",
-                  fontWeight: ch.id === currentChapter.id ? 600 : 400,
-                }}
+                className={`w-full text-left px-5 py-2.5 text-sm sidebar-item ${ch.id === currentChapter.id ? 'active' : ''}`}
                 onClick={() => goToChapter(ch.id)}
-                onMouseEnter={(e) => { if (ch.id !== currentChapter.id) e.currentTarget.style.background = "var(--bg-tertiary)"; }}
-                onMouseLeave={(e) => { if (ch.id !== currentChapter.id) e.currentTarget.style.background = "transparent"; }}
               >
                 <span className="mr-2 text-xs tabular-nums" style={{ color: "var(--text-tertiary)", minWidth: 24, display: "inline-block" }}>{i + 1}</span>
                 {ch.title || `第 ${i + 1} 章`}
@@ -393,13 +385,13 @@ export function Reader() {
         <header className="flex items-center justify-between px-5 py-2.5 flex-shrink-0"
           style={{ borderBottom: "1px solid var(--border)", background: "var(--bg-elevated)" }}>
           <div className="flex items-center gap-1">
-            <ToolbarBtn onClick={goBack} title="Back">
+            <ToolbarBtn onClick={goBack} title="返回">
               <path d="M19 12H5M12 19l-7-7 7-7" />
             </ToolbarBtn>
-            <ToolbarBtn active={showSidebar} onClick={() => setShowSidebar(!showSidebar)} title="Directory">
+            <ToolbarBtn active={showSidebar} onClick={() => setShowSidebar(!showSidebar)} title="目录">
               <><line x1="3" y1="6" x2="21" y2="6" /><line x1="3" y1="12" x2="15" y2="12" /><line x1="3" y1="18" x2="21" y2="18" /></>
             </ToolbarBtn>
-            <ToolbarBtn active={showNotes} onClick={() => setShowNotes(!showNotes)} title="Notes">
+            <ToolbarBtn active={showNotes} onClick={() => setShowNotes(!showNotes)} title="笔记">
               <><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" /><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" /></>
             </ToolbarBtn>
           </div>
@@ -688,8 +680,8 @@ export function Reader() {
             <span className="text-xs tabular-nums" style={{ color: "var(--text-tertiary)" }}>
               {currentBook.total_chars?.toLocaleString() || "?"} 字
             </span>
-            <div className="w-20 h-1 rounded-full overflow-hidden" style={{ background: "var(--bg-tertiary)" }}>
-              <div className="h-full rounded-full transition-all" style={{ width: `${progressPct}%`, background: "var(--accent)" }} />
+            <div className="w-20 progress-bar">
+              <div className="progress-bar-fill" style={{ width: `${progressPct}%` }} />
             </div>
             <span className="text-xs tabular-nums w-8 text-right" style={{ color: "var(--text-tertiary)" }}>{progressPct}%</span>
           </div>
@@ -707,11 +699,9 @@ function ToolbarBtn({ onClick, active, title, children }: {
   onClick: () => void; active?: boolean; title: string; children: React.ReactNode;
 }) {
   return (
-    <button className="px-2.5 py-1.5 rounded-lg text-sm flex items-center gap-1.5"
+    <button className={`px-2.5 py-1.5 rounded-lg text-sm flex items-center gap-1.5 hover-bg`}
       style={{ color: active ? "var(--accent)" : "var(--text-secondary)", background: active ? "var(--accent-soft)" : "transparent" }}
       onClick={onClick}
-      onMouseEnter={(e) => { if (!active) e.currentTarget.style.background = "var(--bg-tertiary)"; }}
-      onMouseLeave={(e) => { if (!active) e.currentTarget.style.background = "transparent"; }}
       title={title}>
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">{children}</svg>
       {title}

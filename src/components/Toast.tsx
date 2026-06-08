@@ -41,15 +41,8 @@ export function ToastContainer() {
       {items.map((t) => (
         <div
           key={t.id}
-          className="px-4 py-2.5 rounded-lg text-sm shadow-lg animate-slide-down pointer-events-auto"
-          style={{
-            background: t.type === "error" ? "var(--color-red-50, #fef2f2)" : t.type === "success" ? "var(--color-green-50, #f0fdf4)" : "var(--bg-elevated)",
-            color: t.type === "error" ? "var(--color-red-700, #b91c1c)" : t.type === "success" ? "var(--color-green-700, #15803d)" : "var(--text-primary)",
-            border: `1px solid ${t.type === "error" ? "var(--color-red-200, #fecaca)" : t.type === "success" ? "var(--color-green-200, #bbf7d0)" : "var(--border)"}`,
-            minWidth: 200,
-            maxWidth: 400,
-            textAlign: "center",
-          }}
+          className={`px-4 py-2.5 text-sm shadow-lg animate-slide-down pointer-events-auto toast-${t.type}`}
+          style={{ borderRadius: "var(--radius-md)", minWidth: 200, maxWidth: 400, textAlign: "center" }}
         >
           {t.message}
         </div>

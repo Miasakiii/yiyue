@@ -129,7 +129,7 @@ export function ComicReader() {
       <div className="flex items-center justify-center h-screen" style={{ background: "var(--bg-primary)" }}>
         <div className="flex flex-col items-center gap-3">
           <div className="w-8 h-8 rounded-full border-2 border-t-transparent animate-spin" style={{ borderColor: "var(--accent)", borderTopColor: "transparent" }} />
-          <div className="text-sm" style={{ color: "var(--text-tertiary)" }}>Loading...</div>
+          <div className="text-sm" style={{ color: "var(--text-tertiary)" }}>加载中...</div>
         </div>
       </div>
     );
@@ -151,7 +151,7 @@ export function ComicReader() {
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <path d="M19 12H5M12 19l-7-7 7-7" />
             </svg>
-            Back
+            返回
           </button>
           <span className="text-sm truncate max-w-xs" style={{ color: "var(--text-secondary)" }}>{currentBook.title}</span>
         </div>
@@ -214,7 +214,7 @@ export function ComicReader() {
           <div className="flex items-center justify-center h-full">
             <div className="flex flex-col items-center gap-3">
               <div className="w-8 h-8 rounded-full border-2 border-t-transparent animate-spin" style={{ borderColor: "var(--accent)", borderTopColor: "transparent" }} />
-              <div className="text-sm" style={{ color: "var(--text-tertiary)" }}>Loading...</div>
+              <div className="text-sm" style={{ color: "var(--text-tertiary)" }}>加载中...</div>
             </div>
           </div>
         ) : pages.length === 0 ? (
@@ -225,7 +225,7 @@ export function ComicReader() {
                 <circle cx="8.5" cy="8.5" r="1.5" />
                 <polyline points="21 15 16 10 5 21" />
               </svg>
-              <div className="text-sm" style={{ color: "var(--text-tertiary)" }}>No images found</div>
+              <div className="text-sm" style={{ color: "var(--text-tertiary)" }}>未找到图片</div>
             </div>
           </div>
         ) : isWebtoon ? (
