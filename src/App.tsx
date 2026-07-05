@@ -1,25 +1,24 @@
 import { useEffect, useState } from "react";
+import { Routes, Route, Navigate, useNavigate } from "react-router-dom";
 import { useAppStore } from "./stores/app";
 import { Library } from "./pages/Library";
 import { Reader } from "./pages/Reader";
 import { ComicReader } from "./pages/ComicReader";
 import { Stats } from "./pages/Stats";
 import { SyncSettings } from "./pages/SyncSettings";
+import { Rules } from "./pages/Rules";
 import { SearchPanel } from "./components/SearchPanel";
 import { ToastContainer } from "./components/Toast";
 import "./App.css";
 
-type Page = "library" | "reader" | "stats" | "sync";
-
 function App() {
   const { currentBook, loadBooks } = useAppStore();
+  const navigate = useNavigate();
   const [showSearch, setShowSearch] = useState(false);
-  const [page, setPage] = useState<Page>("library");
-  const [initError, setInitError] = useState<string | null>(null);
 
   useEffect(() => {
     loadBooks().catch((e) => {
-      setInitError(`loadBooks failed: ${e}`);
+      console.error("loadBooks failed:", e);
     });
   }, [loadBooks]);
 
@@ -51,57 +50,34 @@ function App() {
 
   // Auto-navigate to reader when book is opened, back to library when closed
   useEffect(() => {
-    if (currentBook && page === "library") {
-      setPage("reader");
-    } else if (!currentBook && page === "reader") {
-      setPage("library");
+    if (currentBook) {
+      navigate("/reader");
+    } else {
+      navigate("/");
     }
-  }, [currentBook, page]);
-
-  // Show init error if any
-  if (initError) {
-    return (
-      <div
-        style={{
-          padding: 40,
-          fontFamily: "monospace",
-          background: "#fff",
-          color: "#ef4444",
-          height: "100vh",
-        }}
-      >
-        <h2>初始化错误</h2>
-        <pre>{initError}</pre>
-        <button
-          style={{ marginTop: 16, padding: "8px 16px" }}
-          onClick={() => window.location.reload()}
-        >
-          刷新
-        </button>
-      </div>
-    );
-  }
-
-  if (page === "stats") {
-    return <Stats onClose={() => setPage("library")} />;
-  }
-
-  if (page === "sync") {
-    return <SyncSettings onClose={() => setPage("library")} />;
-  }
+  }, [currentBook, navigate]);
 
   const isComic = currentBook?.kind === "comic";
 
   return (
     <>
-      {currentBook || page === "reader" ? (
-        isComic ? <ComicReader /> : <Reader />
-      ) : (
-        <Library
-          onShowStats={() => setPage("stats")}
-          onShowSync={() => setPage("sync")}
+      <Routes>
+        <Route path="/" element={<Library />} />
+        <Route path="/stats" element={<Stats />} />
+        <Route path="/sync" element={<SyncSettings />} />
+        <Route path="/rules" element={<Rules />} />
+        <Route
+          path="/reader"
+          element={
+            currentBook ? (
+              isComic ? <ComicReader /> : <Reader />
+            ) : (
+              <Navigate to="/" replace />
+            )
+          }
         />
-      )}
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
       <SearchPanel
         visible={showSearch}
         onClose={() => setShowSearch(false)}

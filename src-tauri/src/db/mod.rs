@@ -3,12 +3,14 @@ pub mod schema;
 use rusqlite::Connection;
 use std::fs;
 use std::path::PathBuf;
-use std::sync::Mutex;
+use std::sync::Arc;
+use parking_lot::Mutex;
 use tauri::AppHandle;
 use tauri::Manager;
 
+#[derive(Clone)]
 pub struct DbConn {
-    pub conn: Mutex<Connection>,
+    pub conn: Arc<Mutex<Connection>>,
 }
 
 #[derive(Debug, thiserror::Error)]

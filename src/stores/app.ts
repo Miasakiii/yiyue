@@ -12,6 +12,10 @@ import type {
   Group,
   ReadingProfile,
   SaveReadingProfile,
+  Rule,
+  RuleGroup,
+  CreateRule,
+  UpdateRule,
 } from "../types";
 
 interface AppState {
@@ -33,6 +37,11 @@ interface AppState {
   groups: Group[];
   activeTag: string | null;
   activeGroup: string | null;
+
+  // Rules
+  rules: Rule[];
+  ruleGroups: RuleGroup[];
+  rulesLoading: boolean;
 
   // Theme
   theme: "light" | "dark" | "sepia";
@@ -73,6 +82,16 @@ interface AppState {
   addBookGroup: (bookId: string, groupId: string) => Promise<void>;
   removeBookGroup: (bookId: string, groupId: string) => Promise<void>;
   getBookGroups: (bookId: string) => Promise<Group[]>;
+
+  // Rules actions
+  loadRules: () => Promise<void>;
+  loadRuleGroups: () => Promise<void>;
+  createRule: (rule: CreateRule) => Promise<Rule>;
+  updateRule: (id: string, updates: UpdateRule) => Promise<void>;
+  deleteRule: (id: string) => Promise<void>;
+  createRuleGroup: (name: string, description?: string, isPreset?: boolean) => Promise<RuleGroup>;
+  deleteRuleGroup: (id: string) => Promise<void>;
+  applyRulesToBook: (bookId: string) => Promise<number>;
 }
 
 export const useAppStore = create<AppState>((set, get) => ({
@@ -89,6 +108,10 @@ export const useAppStore = create<AppState>((set, get) => ({
   groups: [],
   activeTag: null,
   activeGroup: null,
+  rules: [],
+  ruleGroups: [],
+  rulesLoading: false,
+
   theme: (localStorage.getItem("reader-theme") as "light" | "dark" | "sepia") || "light",
 
   loadBooks: async (filter?: BookFilter) => {
@@ -361,5 +384,108 @@ export const useAppStore = create<AppState>((set, get) => ({
       console.error("Failed to get book groups:", e);
       return [];
     }
+  },
+
+  // Rules actions
+  loadRules: async () => {
+    set({ rulesLoading: true });
+    try {
+      const rules = await invoke<any[]>("get_rules");
+      set({ rules, rulesLoading: false });
+    } catch (e) {
+      console.error("Failed to load rules:", e);
+      set({ rulesLoading: false });
+    }
+  },
+
+  loadRuleGroups: async () => {
+    try {
+      const groups = await invoke<any[]>("get_rule_groups");
+      set({ ruleGroups: groups });
+    } catch (e) {
+      console.error("Failed to load rule groups:", e);
+    }
+  },
+
+  createRule: async (rule: CreateRule) => {
+    try {
+      const created = await invoke<any>("create_rule", {
+        name: rule.name,
+        pattern: rule.pattern,
+        replacement: rule.replacement,
+        scope: rule.scope,
+        isRegex: rule.is_regex,
+        priority: rule.priority,
+        groupId: rule.group_id,
+        description: rule.description,
+      });
+      set({ rules: [...get().rules, created] });
+      return created;
+    } catch (e) {
+      console.error("Failed to create rule:", e);
+      showToast("创建规则失败", "error");
+      throw e;
+    }
+  },
+
+  updateRule: async (id: string, updates: UpdateRule) => {
+    try {
+      await invoke("update_rule", {
+        id,
+        name: updates.name,
+        pattern: updates.pattern,
+        replacement: updates.replacement,
+        scope: updates.scope,
+        isRegex: updates.is_regex,
+        enabled: updates.enabled,
+        priority: updates.priority,
+        groupId: updates.group_id,
+        description: updates.description,
+      });
+      get().loadRules();
+    } catch (e) {
+      console.error("Failed to update rule:", e);
+      showToast("更新规则失败", "error");
+    }
+  },
+
+  deleteRule: async (id: string) => {
+    try {
+      await invoke("delete_rule", { id });
+      set({ rules: get().rules.filter((r) => r.id !== id) });
+    } catch (e) {
+      console.error("Failed to delete rule:", e);
+      showToast("删除规则失败", "error");
+    }
+  },
+
+  createRuleGroup: async (name: string, description?: string, isPreset?: boolean) => {
+    try {
+      const group = await invoke<any>("create_rule_group", {
+        name,
+        description,
+        isPreset: isPreset ?? false,
+      });
+      set({ ruleGroups: [...get().ruleGroups, group] });
+      return group;
+    } catch (e) {
+      console.error("Failed to create rule group:", e);
+      showToast("创建分组失败", "error");
+      throw e;
+    }
+  },
+
+  deleteRuleGroup: async (id: string) => {
+    try {
+      await invoke("delete_rule_group", { id });
+      set({ ruleGroups: get().ruleGroups.filter((g) => g.id !== id) });
+    } catch (e) {
+      console.error("Failed to delete rule group:", e);
+      showToast("删除分组失败", "error");
+    }
+  },
+
+  applyRulesToBook: async (_bookId: string) => {
+    return 0;
   },
 }));

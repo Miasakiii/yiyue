@@ -2,19 +2,25 @@
 
 > 本地优先的桌面阅读器 — 翻开一页，沉浸阅读
 
-一款基于 **Tauri 2.0** 的轻量桌面阅读器，支持 TXT、EPUB、PDF、Markdown、DOCX、CBZ、CBR 等格式，提供干净的阅读体验、笔记系统、全文搜索和 WebDAV 同步。
+一款基于 **Tauri 2.0** 的轻量桌面阅读器，支持 TXT、EPUB、PDF、Markdown、DOCX、CBZ、CBR 等格式，提供干净的阅读体验、笔记系统、规则引擎、全文搜索和 WebDAV 同步。
 
 ---
 
 ## 功能特性
 
 ### 多格式阅读
-- **TXT** — 自动编码检测 (GBK/UTF-8)、章节智能切分、干扰词过滤
+- **TXT** — 自动编码检测 (GBK/UTF-8)、章节智能切分、干扰词过滤（内置网文清洗套装）
 - **EPUB** — 元数据提取、HTML 渲染
 - **PDF** — 页码章节、纯 Rust 解析
 - **DOCX** — Word 文档解析、标题检测章节切分
 - **Markdown** — pulldown-cmark 渲染、语法高亮
 - **CBZ / CBR / 文件夹漫画** — 单页模式 + 条漫/滚动模式 + 双页模式
+
+### 规则引擎
+- 可视化规则管理页面，支持正则/文本替换规则
+- 内置"网文清洗套装"预设：去除网址、水印、广告、乱码、合并空行
+- 支持自定义规则分组、优先级排序、启用/禁用
+- 对任意书籍一键批量应用规则，自动重建全文索引
 
 ### 笔记系统
 - 7 色划线标注（重点、存疑、标记、灵感、引用、感悟、待确认）
@@ -55,6 +61,7 @@
 |---|---|
 | 桌面框架 | Tauri 2.0 |
 | 前端 | React 19 + TypeScript + Vite 7 + Tailwind CSS 4 |
+| 路由 | react-router-dom v7 |
 | 状态管理 | Zustand |
 | 后端 | Rust (tokio) |
 | 数据库 | SQLite (rusqlite) + FTS5 |
@@ -98,7 +105,8 @@ pnpm tauri build
 ```
 一页/
 ├── src/                          # React 前端
-│   ├── App.tsx                   # 根组件 / 路由
+│   ├── main.tsx                  # 入口：BrowserRouter 包裹 App
+│   ├── App.tsx                   # 路由配置 (react-router-dom v7)
 │   ├── App.css                   # 全局样式 + 主题变量
 │   ├── constants.ts              # 共享常量
 │   ├── hooks/                    # 共享 hooks
@@ -114,22 +122,40 @@ pnpm tauri build
 │   │   ├── Reader.tsx            # 小说阅读器
 │   │   ├── ComicReader.tsx       # 漫画阅读器
 │   │   ├── Stats.tsx             # 阅读统计
-│   │   └── SyncSettings.tsx      # 同步设置
+│   │   ├── SyncSettings.tsx      # 同步设置
+│   │   └── Rules.tsx             # 规则引擎管理
 │   └── types/index.ts            # TypeScript 类型
 ├── src-tauri/                    # Rust 后端
 │   ├── src/
-│   │   ├── lib.rs                # 入口 (44 个 IPC 命令)
-│   │   ├── commands/             # Tauri 命令层
-│   │   ├── db/                   # SQLite 数据库
-│   │   ├── parser/               # 格式解析器 (txt/epub/pdf/docx/md/comic)
-│   │   ├── rules/                # 规则引擎
-│   │   ├── search/               # 搜索引擎 (jieba 分词)
-│   │   ├── sync/                 # WebDAV 同步
-│   │   ├── models/               # 数据模型
-│   │   └── main.rs
+│   │   ├── lib.rs                # 入口 (52 个 IPC 命令)
+│   │   ├── main.rs               # Tauri 引导
+│   │   ├── commands/             # Tauri 命令层 (9 个文件)
+│   │   │   ├── books.rs          # 书籍 CRUD
+│   │   │   ├── import.rs         # 导入 (TXT/EPUB/PDF/MD/DOCX/CBZ/CBR)
+│   │   │   ├── rules.rs          # 规则引擎 CRUD + 应用
+│   │   │   ├── tags.rs           # 标签/分组
+│   │   │   ├── annotations.rs    # 笔记
+│   │   │   ├── search.rs         # 搜索 + 索引
+│   │   │   ├── export.rs         # 导出
+│   │   │   ├── stats.rs          # 统计
+│   │   │   └── sync.rs           # WebDAV 同步
+│   │   ├── db/                   # SQLite 数据库 (17 表 + FTS5)
+│   │   ├── parser/               # 格式解析器
+│   │   │   ├── txt.rs            # TXT (编码检测 + 章节切分 + 规则清洗)
+│   │   │   ├── epub.rs           # EPUB
+│   │   │   ├── pdf.rs            # PDF
+│   │   │   ├── docx.rs           # DOCX
+│   │   │   ├── markdown.rs       # Markdown (pulldown-cmark)
+│   │   │   └── comic.rs          # 漫画 (CBZ/CBR/文件夹)
+│   │   ├── rules/                # 规则引擎核心 + 预设
+│   │   ├── search/               # jieba 分词
+│   │   ├── sync/                 # WebDAV 客户端
+│   │   └── models/               # 数据模型
 │   ├── Cargo.toml
 │   └── tauri.conf.json
 ├── PRD.md                        # 产品需求文档
+├── STATUS.md                     # 项目状态报告
+├── FUTURE.md                     # 未来路线图
 └── README.md
 ```
 
@@ -155,7 +181,7 @@ pnpm tauri build
 
 | 操作 | 快捷键 |
 |---|---|
-| 下一章 | `→` / `PageDown` / `Space` |
+| 下一章 | `→` / `PageDown` |
 | 上一章 | `←` / `PageUp` |
 | 增大字号 | `Ctrl + =` |
 | 缩小字号 | `Ctrl + -` |
@@ -170,6 +196,16 @@ pnpm tauri build
 | 漫画双页模式 | `D` |
 
 ---
+
+## 路由
+
+| 路径 | 页面 | 说明 |
+|---|---|---|
+| `/` | 书库 | 默认首页 |
+| `/reader` | 阅读器 | 需先打开书籍 |
+| `/stats` | 阅读统计 | 阅读数据总览 |
+| `/sync` | 同步设置 | WebDAV 配置 |
+| `/rules` | 规则引擎 | 规则管理 + 应用 |
 
 ---
 

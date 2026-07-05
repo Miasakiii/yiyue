@@ -122,3 +122,49 @@ export interface SaveReadingProfile {
   text_align?: string;
   page_animation?: string;
 }
+
+/* ---------- Rules ---------- */
+
+export interface Rule {
+  id: string;
+  name: string;
+  pattern: string;
+  replacement: string;
+  scope: string;
+  is_regex: boolean;
+  enabled: boolean;
+  priority: number;
+  group_id: string | null;
+  description: string | null;
+}
+
+export interface RuleGroup {
+  id: string;
+  name: string;
+  description: string | null;
+  is_preset: boolean;
+  enabled: boolean;
+}
+
+export interface CreateRule {
+  name: string;
+  pattern: string;
+  replacement: string;
+  scope: string;
+  is_regex: boolean;
+  priority: number;
+  group_id?: string | null;
+  description?: string | null;
+}
+
+export interface UpdateRule {
+  name?: string;
+  pattern?: string;
+  replacement?: string;
+  scope?: string;
+  is_regex?: boolean;
+  enabled?: boolean;
+  priority?: number;
+  group_id?: string | null;
+  description?: string | null;
+}

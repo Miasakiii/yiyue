@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { invoke } from "@tauri-apps/api/core";
 
 interface WebDavConfig {
@@ -17,7 +18,8 @@ interface SyncStatus {
   error: string | null;
 }
 
-export function SyncSettings({ onClose }: { onClose: () => void }) {
+export function SyncSettings() {
+  const navigate = useNavigate();
   const [config, setConfig] = useState<WebDavConfig>({
     server_url: "",
     username: "",
@@ -120,7 +122,7 @@ export function SyncSettings({ onClose }: { onClose: () => void }) {
           <button
             className="px-2.5 py-1.5 rounded-lg text-sm flex items-center gap-1.5"
             style={{ color: "var(--text-secondary)" }}
-            onClick={onClose}
+            onClick={() => navigate("/")}
             onMouseEnter={(e) => {
               e.currentTarget.style.background = "var(--bg-tertiary)";
             }}

@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { invoke } from "@tauri-apps/api/core";
 
 interface ReadingStats {
@@ -39,7 +40,8 @@ function formatChars(chars: number): string {
   return `${chars}字`;
 }
 
-export function Stats({ onClose }: { onClose: () => void }) {
+export function Stats() {
+  const navigate = useNavigate();
   const [stats, setStats] = useState<ReadingStats | null>(null);
   const [dailyStats, setDailyStats] = useState<DailyStats[]>([]);
   const [bookStats, setBookStats] = useState<BookStats[]>([]);
@@ -106,7 +108,7 @@ export function Stats({ onClose }: { onClose: () => void }) {
           <button
             className="px-2.5 py-1.5 rounded-lg text-sm flex items-center gap-1.5"
             style={{ color: "var(--text-secondary)" }}
-            onClick={onClose}
+            onClick={() => navigate("/")}
             onMouseEnter={(e) => {
               e.currentTarget.style.background = "var(--bg-tertiary)";
             }}

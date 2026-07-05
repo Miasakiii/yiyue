@@ -1,4 +1,4 @@
-use crate::commands::search as search_cmd;
+﻿use crate::commands::search as search_cmd;
 use crate::db::DbConn;
 use crate::models::*;
 use rusqlite::params;
@@ -9,7 +9,7 @@ pub fn get_books(
     db: State<'_, DbConn>,
     filter: Option<BookFilter>,
 ) -> Result<Vec<BookListItem>, String> {
-    let conn = db.conn.lock().map_err(|e| e.to_string())?;
+    let conn = db.conn.lock();
     let filter = filter.unwrap_or(BookFilter {
         kind: None,
         tag: None,
@@ -98,7 +98,7 @@ pub fn get_books(
 
 #[tauri::command]
 pub fn get_book(db: State<'_, DbConn>, id: String) -> Result<Book, String> {
-    let conn = db.conn.lock().map_err(|e| e.to_string())?;
+    let conn = db.conn.lock();
     conn.query_row(
         "SELECT id, kind, title, author, file_hash, file_path, file_size, format,
                 cover_path, description, language, total_chapters, total_chars,
@@ -136,7 +136,7 @@ pub fn update_book(
     id: String,
     update: UpdateBook,
 ) -> Result<(), String> {
-    let conn = db.conn.lock().map_err(|e| e.to_string())?;
+    let conn = db.conn.lock();
 
     let mut sets = Vec::new();
     let mut param_values: Vec<Box<dyn rusqlite::types::ToSql>> = Vec::new();
@@ -176,7 +176,7 @@ pub fn update_book(
 
 #[tauri::command]
 pub fn delete_book(db: State<'_, DbConn>, id: String) -> Result<(), String> {
-    let conn = db.conn.lock().map_err(|e| e.to_string())?;
+    let conn = db.conn.lock();
 
     // Remove from FTS indexes
     search_cmd::remove_book_from_index(&conn, &id)?;
@@ -192,7 +192,7 @@ pub fn delete_book(db: State<'_, DbConn>, id: String) -> Result<(), String> {
 
 #[tauri::command]
 pub fn get_chapters(db: State<'_, DbConn>, book_id: String) -> Result<Vec<Chapter>, String> {
-    let conn = db.conn.lock().map_err(|e| e.to_string())?;
+    let conn = db.conn.lock();
     let mut stmt = conn
         .prepare(
             "SELECT id, book_id, title, level, sort_order, start_offset, end_offset, char_count
@@ -227,7 +227,7 @@ pub fn get_progress(
     db: State<'_, DbConn>,
     book_id: String,
 ) -> Result<Option<ReadingProgress>, String> {
-    let conn = db.conn.lock().map_err(|e| e.to_string())?;
+    let conn = db.conn.lock();
     let result = conn.query_row(
         "SELECT book_id, chapter_id, scroll_offset, page_index, percentage, last_read_at
          FROM reading_progress WHERE book_id = ?1",
@@ -257,7 +257,7 @@ pub fn update_progress(
     book_id: String,
     progress: UpdateProgress,
 ) -> Result<(), String> {
-    let conn = db.conn.lock().map_err(|e| e.to_string())?;
+    let conn = db.conn.lock();
 
     conn.execute(
         "INSERT INTO reading_progress (book_id, chapter_id, scroll_offset, page_index, percentage, last_read_at)
@@ -290,7 +290,7 @@ pub fn update_progress(
 
 #[tauri::command]
 pub fn toggle_favorite(db: State<'_, DbConn>, book_id: String) -> Result<bool, String> {
-    let conn = db.conn.lock().map_err(|e| e.to_string())?;
+    let conn = db.conn.lock();
 
     let exists: bool = conn
         .query_row(
@@ -320,7 +320,7 @@ pub fn get_chapter_content(
     db: State<'_, DbConn>,
     chapter_id: String,
 ) -> Result<String, String> {
-    let conn = db.conn.lock().map_err(|e| e.to_string())?;
+    let conn = db.conn.lock();
     conn.query_row(
         "SELECT content FROM chapters WHERE id = ?1",
         params![chapter_id],
@@ -334,7 +334,7 @@ pub fn get_reading_profile(
     db: State<'_, DbConn>,
     book_id: String,
 ) -> Result<Option<ReadingProfile>, String> {
-    let conn = db.conn.lock().map_err(|e| e.to_string())?;
+    let conn = db.conn.lock();
     let result = conn.query_row(
         "SELECT book_id, font_size, line_height, font_family, content_width, paragraph_spacing, text_align, page_animation
          FROM reading_profiles WHERE book_id = ?1",
@@ -366,7 +366,7 @@ pub fn save_reading_profile(
     book_id: String,
     profile: SaveReadingProfile,
 ) -> Result<(), String> {
-    let conn = db.conn.lock().map_err(|e| e.to_string())?;
+    let conn = db.conn.lock();
 
     conn.execute(
         "INSERT INTO reading_profiles (book_id, font_size, line_height, font_family, content_width, paragraph_spacing, text_align, page_animation)

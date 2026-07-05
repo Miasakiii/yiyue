@@ -1,4 +1,4 @@
-use crate::db::DbConn;
+﻿use crate::db::DbConn;
 use rusqlite::params;
 use serde::{Deserialize, Serialize};
 use tauri::State;
@@ -50,7 +50,7 @@ pub fn get_annotations(
     book_id: String,
     chapter_id: Option<String>,
 ) -> Result<Vec<Annotation>, String> {
-    let conn = db.conn.lock().map_err(|e| e.to_string())?;
+    let conn = db.conn.lock();
 
     let (sql, param_values): (String, Vec<Box<dyn rusqlite::types::ToSql>>) = if let Some(ch_id) = chapter_id {
         (
@@ -112,7 +112,7 @@ pub fn create_annotation(
     db: State<'_, DbConn>,
     annotation: CreateAnnotation,
 ) -> Result<Annotation, String> {
-    let conn = db.conn.lock().map_err(|e| e.to_string())?;
+    let conn = db.conn.lock();
     let id = Uuid::new_v4().to_string();
     let color = annotation.color.unwrap_or_else(|| "#FFEB3B".to_string());
     let annotation_type = annotation
@@ -177,7 +177,7 @@ pub fn update_annotation(
     id: String,
     update: UpdateAnnotation,
 ) -> Result<(), String> {
-    let conn = db.conn.lock().map_err(|e| e.to_string())?;
+    let conn = db.conn.lock();
 
     let mut sets = Vec::new();
     let mut param_values: Vec<Box<dyn rusqlite::types::ToSql>> = Vec::new();
@@ -220,7 +220,7 @@ pub fn update_annotation(
 
 #[tauri::command]
 pub fn delete_annotation(db: State<'_, DbConn>, id: String) -> Result<(), String> {
-    let conn = db.conn.lock().map_err(|e| e.to_string())?;
+    let conn = db.conn.lock();
     // Remove from FTS before soft-delete
     let _ = conn.execute(
         "DELETE FROM annotations_fts WHERE rowid = (SELECT rowid FROM annotations WHERE id = ?1)",

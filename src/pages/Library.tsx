@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { useAppStore } from "../stores/app";
 import { BookCard } from "../components/BookCard";
 import { SUPPORTED_EXTENSIONS } from "../constants";
@@ -17,7 +18,8 @@ const SORT_OPTIONS: { key: SortKey; label: string }[] = [
   { key: "progress", label: "阅读进度" },
 ];
 
-export function Library({ onShowStats, onShowSync }: { onShowStats?: () => void; onShowSync?: () => void }) {
+export function Library() {
+  const navigate = useNavigate();
   const {
     books, loading, viewMode, setViewMode, importBook,
     tags, groups, activeTag, activeGroup,
@@ -540,40 +542,53 @@ export function Library({ onShowStats, onShowSync }: { onShowStats?: () => void;
             </div>
 
             {/* Stats button */}
-            {onShowStats && (
-              <button
-                className="px-3 py-1.5 rounded-lg text-xs flex items-center gap-1.5"
-                style={{
-                  color: "var(--text-secondary)",
-                  border: "1px solid var(--border)",
-                  background: "var(--bg-secondary)",
-                }}
-                onClick={onShowStats}
-              >
+            <button
+              className="px-3 py-1.5 rounded-lg text-xs flex items-center gap-1.5"
+              style={{
+                color: "var(--text-secondary)",
+                border: "1px solid var(--border)",
+                background: "var(--bg-secondary)",
+              }}
+              onClick={() => navigate("/stats")}
+            >
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                   <path d="M18 20V10M12 20V4M6 20v-6" />
                 </svg>
-                统计
+                 统计
               </button>
-            )}
 
             {/* Sync button */}
-            {onShowSync && (
-              <button
-                className="px-3 py-1.5 rounded-lg text-xs flex items-center gap-1.5"
-                style={{
-                  color: "var(--text-secondary)",
-                  border: "1px solid var(--border)",
-                  background: "var(--bg-secondary)",
-                }}
-                onClick={onShowSync}
-              >
+            <button
+              className="px-3 py-1.5 rounded-lg text-xs flex items-center gap-1.5"
+              style={{
+                color: "var(--text-secondary)",
+                border: "1px solid var(--border)",
+                background: "var(--bg-secondary)",
+              }}
+              onClick={() => navigate("/sync")}
+            >
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                   <path d="M21 12a9 9 0 0 1-9 9m9-9a9 9 0 0 0-9-9m9 9H3m9 9a9 9 0 0 1-9-9m9 9c1.66 0 3-4.03 3-9s-1.34-9-3-9m0 18c-1.66 0-3-4.03-3-9s1.34-9 3-9" />
                 </svg>
-                同步
+                 同步
               </button>
-            )}
+
+            {/* Rules button */}
+            <button
+              className="px-3 py-1.5 rounded-lg text-xs flex items-center gap-1.5"
+              style={{
+                color: "var(--text-secondary)",
+                border: "1px solid var(--border)",
+                background: "var(--bg-secondary)",
+              }}
+              onClick={() => navigate("/rules")}
+            >
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
+                <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
+              </svg>
+              规则
+            </button>
 
             {/* Import button */}
             <button

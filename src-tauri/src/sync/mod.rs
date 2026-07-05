@@ -1,9 +1,17 @@
 use serde::{Deserialize, Serialize};
 
+/// Application-level error for keyring operations.
+/// We don't want to surface detailed OS-keyring errors to the user.
+const KEYRING_SERVICE: &str = "yiyue-webdav";
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct WebDavConfig {
     pub server_url: String,
     pub username: String,
+    /// Password is NOT serialized to the DB; it lives in the OS keyring.
+    /// In-flight structs may still carry a plaintext copy, but the DB and
+    /// serialized JSON never contain it.
+    #[serde(skip)]
     pub password: String,
     pub remote_path: String, // e.g., "/yiyue/"
     pub auto_sync: bool,
@@ -23,6 +31,35 @@ impl Default for WebDavConfig {
     }
 }
 
+/// Persist the password in the OS-level credential store.
+/// Returns an empty result on success; the caller can surface a user-friendly
+/// message on failure.
+pub fn store_webdav_password(username: &str, password: &str) -> Result<(), String> {
+    let entry = keyring::Entry::new(KEYRING_SERVICE, username)
+        .map_err(|e| format!("Failed to access keyring: {}", e))?;
+    entry
+        .set_password(password)
+        .map_err(|e| format!("Failed to store password: {}", e))
+}
+
+/// Retrieve the WebDAV password from the OS-level credential store.
+pub fn retrieve_webdav_password(username: &str) -> Result<String, String> {
+    let entry = keyring::Entry::new(KEYRING_SERVICE, username)
+        .map_err(|e| format!("Failed to access keyring: {}", e))?;
+    entry
+        .get_password()
+        .map_err(|e| format!("Failed to retrieve password: {}", e))
+}
+
+/// Delete the WebDAV password from the OS-level credential store.
+pub fn delete_webdav_password(username: &str) -> Result<(), String> {
+    let entry = keyring::Entry::new(KEYRING_SERVICE, username)
+        .map_err(|e| format!("Failed to access keyring: {}", e))?;
+    entry
+        .delete_credential()
+        .map_err(|e| format!("Failed to delete password: {}", e))
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SyncStatus {
     pub last_sync: Option<String>,
@@ -39,6 +76,19 @@ pub struct WebDavClient {
 
 impl WebDavClient {
     pub fn new(config: WebDavConfig) -> Self {
+        // Warn if server_url is not using HTTPS — credentials would be sent in
+        // plaintext over HTTP. This is a soft check; the application still allows
+        // the connection for local/trusted network scenarios, but the warning
+        // should be shown to the user via the UI.
+        if !config.server_url.starts_with("https://") && !config.server_url.is_empty() {
+            #[cfg(debug_assertions)]
+            eprintln!(
+                "[yiyue] WARNING: WebDAV server URL does not use HTTPS. \
+                 Credentials will be sent in plaintext: {}",
+                config.server_url
+            );
+        }
+
         let client = reqwest::blocking::Client::builder()
             .timeout(std::time::Duration::from_secs(30))
             .build()
@@ -114,6 +164,13 @@ impl WebDavClient {
 
     /// Test connection to WebDAV server
     pub fn test_connection(&self) -> Result<(), String> {
+        // Reject non-HTTPS connections with a clear error message
+        if !self.config.server_url.starts_with("https://") && !self.config.server_url.is_empty() {
+            return Err(
+                "安全警告：WebDAV 连接未使用 HTTPS，凭据将以明文传输。请使用 HTTPS 地址。".to_string(),
+            );
+        }
+
         let url = self.base_url();
 
         let resp = self

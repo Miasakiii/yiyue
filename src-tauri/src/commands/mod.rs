@@ -3,6 +3,7 @@ pub mod books;
 pub mod dict;
 pub mod export;
 pub mod import;
+pub mod rules;
 pub mod search;
 pub mod stats;
 pub mod sync;

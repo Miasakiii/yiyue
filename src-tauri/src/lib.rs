@@ -1,5 +1,6 @@
 mod commands;
 mod db;
+mod error;
 mod models;
 mod parser;
 mod rules;
@@ -7,6 +8,7 @@ mod search;
 mod sync;
 
 use tauri::Manager;
+use commands::rules::seed_preset_rules;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -15,7 +17,14 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .setup(|app| {
             let conn = db::init_db(&app.handle())?;
-            app.manage(db::DbConn { conn: std::sync::Mutex::new(conn) });
+            app.manage(db::DbConn { conn: std::sync::Arc::new(parking_lot::Mutex::new(conn)) });
+
+            // Seed preset rules into DB on first launch
+            if let Some(db_state) = app.try_state::<db::DbConn>() {
+                let conn = db_state.conn.lock();
+                let _ = seed_preset_rules(&conn);
+            }
+
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -58,6 +67,15 @@ pub fn run() {
             commands::stats::get_weekly_stats,
             commands::stats::get_book_stats,
             commands::stats::get_reading_speed,
+            commands::rules::get_rules,
+            commands::rules::get_rule_groups,
+            commands::rules::create_rule,
+            commands::rules::update_rule,
+            commands::rules::delete_rule,
+            commands::rules::create_rule_group,
+            commands::rules::delete_rule_group,
+            commands::rules::apply_rules_to_book,
+            commands::rules::init_preset_rules,
             commands::sync::get_webdav_config,
             commands::sync::save_webdav_config,
             commands::sync::test_webdav_connection,

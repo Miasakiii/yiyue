@@ -1,4 +1,4 @@
-use crate::commands::search as search_cmd;
+﻿use crate::commands::search as search_cmd;
 use crate::db::DbConn;
 use crate::models::*;
 use crate::parser::{self, ParseOptions};
@@ -68,7 +68,7 @@ pub async fn import_book(
     // Check for duplicates (quick DB read — hold lock briefly)
     let file_hash = compute_hash(&path)?;
     {
-        let conn = db.conn.lock().map_err(|e| e.to_string())?;
+        let conn = db.conn.lock();
         let exists: bool = conn
             .query_row(
                 "SELECT COUNT(*) FROM books WHERE file_hash = ?1 AND deleted_at IS NULL",
@@ -200,7 +200,7 @@ pub async fn import_book(
 
     // DB writes — hold the lock for the insert batch, then release.
     let book = {
-        let conn = db.conn.lock().map_err(|e| e.to_string())?;
+        let conn = db.conn.lock();
 
         match parsed {
             ParsedImport::Novel { metadata, chapters } => {
@@ -378,7 +378,7 @@ pub async fn import_folder(
 
     // Check for duplicates (ignore soft-deleted books)
     {
-        let conn = db.conn.lock().map_err(|e| e.to_string())?;
+        let conn = db.conn.lock();
         let exists: bool = conn
             .query_row(
                 "SELECT COUNT(*) FROM books WHERE file_hash = ?1 AND deleted_at IS NULL",
@@ -404,7 +404,7 @@ pub async fn import_folder(
 
     // Insert into database
     {
-        let conn = db.conn.lock().map_err(|e| e.to_string())?;
+        let conn = db.conn.lock();
 
         conn.execute(
             "INSERT INTO books (id, kind, title, author, file_hash, file_path, file_size, format,

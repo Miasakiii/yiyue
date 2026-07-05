@@ -1,4 +1,5 @@
 import { useEffect, useState, useRef, useCallback } from "react";
+import { useNavigate } from "react-router-dom";
 import { invoke } from "@tauri-apps/api/core";
 import { useAppStore } from "../stores/app";
 import { HighlightPopover } from "../components/HighlightPopover";
@@ -26,6 +27,7 @@ const CONTENT_WIDTH_PRESETS = [
 
 /* ---------- Component ---------- */
 export function Reader() {
+  const navigate = useNavigate();
   const {
     currentBook, chapters, currentChapter, progress, readingProfile,
     updateProgress, loadChapter, theme, setTheme, saveReadingProfile,
@@ -295,7 +297,8 @@ export function Reader() {
   const { closeBook } = useAppStore.getState();
   const goBack = () => {
     if (currentBook) handleScroll();
-    closeBook();
+    useAppStore.getState().closeBook();
+    navigate("/");
   };
   const handleJumpTo = (chapterId: string, offset: number) => {
     loadChapter(chapterId).then(() => {

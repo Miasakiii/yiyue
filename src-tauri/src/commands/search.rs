@@ -1,4 +1,4 @@
-use crate::db::DbConn;
+﻿use crate::db::DbConn;
 use crate::search;
 use serde::Serialize;
 use tauri::State;
@@ -23,7 +23,7 @@ pub fn search_all(
     query: String,
     scope: Option<String>, // "all", "books", "content", "annotations"
 ) -> Result<Vec<SearchResult>, String> {
-    let conn = db.conn.lock().map_err(|e| e.to_string())?;
+    let conn = db.conn.lock();
     let scope = scope.as_deref().unwrap_or("all");
     let mut results = Vec::new();
 

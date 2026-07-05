@@ -1,4 +1,4 @@
-use crate::db::DbConn;
+﻿use crate::db::DbConn;
 use chrono::Local;
 use rusqlite::params;
 use serde::Serialize;
@@ -207,6 +207,7 @@ fn html_escape(s: &str) -> String {
         .replace('<', "&lt;")
         .replace('>', "&gt;")
         .replace('"', "&quot;")
+        .replace('\'', "&#x27;")
 }
 
 /// Export annotations to a file. Returns the generated content.
@@ -216,7 +217,7 @@ pub fn export_annotations(
     book_id: Option<String>,
     format: String, // "markdown", "html", "json"
 ) -> Result<String, String> {
-    let conn = db.conn.lock().map_err(|e| e.to_string())?;
+    let conn = db.conn.lock();
     let annotations = get_annotations_for_export(&conn, book_id.as_deref())?;
 
     if annotations.is_empty() {
@@ -240,7 +241,7 @@ pub fn get_export_filename(
     book_id: Option<String>,
     format: String,
 ) -> Result<String, String> {
-    let conn = db.conn.lock().map_err(|e| e.to_string())?;
+    let conn = db.conn.lock();
 
     let book_name = if let Some(ref bid) = book_id {
         conn.query_row(

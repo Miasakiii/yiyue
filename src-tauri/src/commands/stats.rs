@@ -1,4 +1,4 @@
-use crate::db::DbConn;
+﻿use crate::db::DbConn;
 use rusqlite::params;
 use serde::Serialize;
 use tauri::State;
@@ -51,7 +51,7 @@ pub fn record_reading_session(
     chars_read: Option<i64>,
     chapters_read: Option<i64>,
 ) -> Result<(), String> {
-    let conn = db.conn.lock().map_err(|e| e.to_string())?;
+    let conn = db.conn.lock();
     let id = Uuid::new_v4().to_string();
 
     conn.execute(
@@ -67,7 +67,7 @@ pub fn record_reading_session(
 /// Get overall reading statistics.
 #[tauri::command]
 pub fn get_reading_stats(db: State<'_, DbConn>) -> Result<ReadingStats, String> {
-    let conn = db.conn.lock().map_err(|e| e.to_string())?;
+    let conn = db.conn.lock();
 
     let total_duration_ms: i64 = conn
         .query_row("SELECT COALESCE(SUM(duration_ms), 0) FROM reading_sessions", [], |r| r.get(0))
@@ -120,7 +120,7 @@ pub fn get_daily_stats(
     db: State<'_, DbConn>,
     days: Option<i64>,
 ) -> Result<Vec<DailyStats>, String> {
-    let conn = db.conn.lock().map_err(|e| e.to_string())?;
+    let conn = db.conn.lock();
     let days = days.unwrap_or(90);
 
     let mut stmt = conn
@@ -160,7 +160,7 @@ pub fn get_weekly_stats(
     db: State<'_, DbConn>,
     weeks: Option<i64>,
 ) -> Result<Vec<WeeklyStats>, String> {
-    let conn = db.conn.lock().map_err(|e| e.to_string())?;
+    let conn = db.conn.lock();
     let weeks = weeks.unwrap_or(12);
 
     let mut stmt = conn
@@ -197,7 +197,7 @@ pub fn get_weekly_stats(
 /// Get per-book reading stats.
 #[tauri::command]
 pub fn get_book_stats(db: State<'_, DbConn>) -> Result<Vec<BookStats>, String> {
-    let conn = db.conn.lock().map_err(|e| e.to_string())?;
+    let conn = db.conn.lock();
 
     let mut stmt = conn
         .prepare(
@@ -245,7 +245,7 @@ pub fn get_reading_speed(
     db: State<'_, DbConn>,
     book_id: String,
 ) -> Result<ReadingSpeed, String> {
-    let conn = db.conn.lock().map_err(|e| e.to_string())?;
+    let conn = db.conn.lock();
 
     // Take the most recent 5 sessions for this book
     let result = conn.query_row(

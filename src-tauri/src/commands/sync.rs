@@ -1,4 +1,4 @@
-use crate::db::DbConn;
+﻿use crate::db::DbConn;
 use crate::sync::{SyncStatus, WebDavClient, WebDavConfig};
 use rusqlite::params;
 use serde::{Deserialize, Serialize};
@@ -14,10 +14,10 @@ pub struct SyncPayload {
     pub timestamp: String,
 }
 
-/// Get WebDAV config from settings.
+/// Get WebDAV config from settings. Password is fetched from the OS keyring.
 #[tauri::command]
 pub fn get_webdav_config(db: State<'_, DbConn>) -> Result<WebDavConfig, String> {
-    let conn = db.conn.lock().map_err(|e| e.to_string())?;
+    let conn = db.conn.lock();
 
     let config_json: Option<String> = conn
         .query_row(
@@ -27,17 +27,33 @@ pub fn get_webdav_config(db: State<'_, DbConn>) -> Result<WebDavConfig, String> 
         )
         .ok();
 
-    if let Some(json) = config_json {
-        serde_json::from_str(&json).map_err(|e| e.to_string())
+    let mut config = if let Some(json) = config_json {
+        serde_json::from_str::<WebDavConfig>(&json).map_err(|e| e.to_string())?
     } else {
-        Ok(WebDavConfig::default())
+        WebDavConfig::default()
+    };
+
+    // Retrieve password from OS keyring
+    if !config.username.is_empty() {
+        config.password = crate::sync::retrieve_webdav_password(&config.username)
+            .unwrap_or_default();
     }
+
+    Ok(config)
 }
 
-/// Save WebDAV config to settings.
+/// Save WebDAV config to settings. Password is stored in the OS keyring,
+/// never written to the database in plaintext.
 #[tauri::command]
 pub fn save_webdav_config(db: State<'_, DbConn>, config: WebDavConfig) -> Result<(), String> {
-    let conn = db.conn.lock().map_err(|e| e.to_string())?;
+    let conn = db.conn.lock();
+
+    // Store password in OS keyring
+    if !config.username.is_empty() && !config.password.is_empty() {
+        crate::sync::store_webdav_password(&config.username, &config.password)?;
+    }
+
+    // Serialize WITHOUT password (skipped via #[serde(skip)])
     let json = serde_json::to_string(&config).map_err(|e| e.to_string())?;
 
     conn.execute(
@@ -73,7 +89,7 @@ pub fn sync_push(db: State<'_, DbConn>) -> Result<SyncStatus, String> {
     client.put("sync_data.json", json.as_bytes())?;
 
     // Update sync log
-    let conn = db.conn.lock().map_err(|e| e.to_string())?;
+    let conn = db.conn.lock();
     conn.execute(
         "UPDATE sync_log SET synced = 1 WHERE synced = 0",
         [],
@@ -110,7 +126,7 @@ pub fn sync_pull(db: State<'_, DbConn>) -> Result<SyncStatus, String> {
     import_sync_data(&db, &payload)?;
 
     // Update last sync time
-    let conn = db.conn.lock().map_err(|e| e.to_string())?;
+    let conn = db.conn.lock();
     let now = chrono::Utc::now().to_rfc3339();
     conn.execute(
         "INSERT OR REPLACE INTO settings (key, value) VALUES ('last_sync', ?1)",
@@ -132,7 +148,7 @@ pub fn sync_full(db: State<'_, DbConn>) -> Result<SyncStatus, String> {
     sync_push_inner(&db)?;
     sync_pull_inner(&db)?;
 
-    let conn = db.conn.lock().map_err(|e| e.to_string())?;
+    let conn = db.conn.lock();
     let last_sync: Option<String> = conn
         .query_row(
             "SELECT value FROM settings WHERE key = 'last_sync'",
@@ -160,7 +176,7 @@ pub fn sync_full(db: State<'_, DbConn>) -> Result<SyncStatus, String> {
 /// Get sync status.
 #[tauri::command]
 pub fn get_sync_status(db: State<'_, DbConn>) -> Result<SyncStatus, String> {
-    let conn = db.conn.lock().map_err(|e| e.to_string())?;
+    let conn = db.conn.lock();
 
     let last_sync: Option<String> = conn
         .query_row(
@@ -189,7 +205,7 @@ pub fn get_sync_status(db: State<'_, DbConn>) -> Result<SyncStatus, String> {
 // Helper functions
 
 fn get_webdav_config_inner(db: &State<'_, DbConn>) -> Result<WebDavConfig, String> {
-    let conn = db.conn.lock().map_err(|e| e.to_string())?;
+    let conn = db.conn.lock();
 
     let config_json: Option<String> = conn
         .query_row(
@@ -200,14 +216,20 @@ fn get_webdav_config_inner(db: &State<'_, DbConn>) -> Result<WebDavConfig, Strin
         .ok();
 
     if let Some(json) = config_json {
-        serde_json::from_str(&json).map_err(|e| e.to_string())
+        let mut config: WebDavConfig =
+            serde_json::from_str(&json).map_err(|e| e.to_string())?;
+        if !config.username.is_empty() {
+            config.password = crate::sync::retrieve_webdav_password(&config.username)
+                .unwrap_or_default();
+        }
+        Ok(config)
     } else {
         Err("WebDAV not configured".to_string())
     }
 }
 
 fn export_sync_data(db: &State<'_, DbConn>) -> Result<SyncPayload, String> {
-    let conn = db.conn.lock().map_err(|e| e.to_string())?;
+    let conn = db.conn.lock();
 
     // Export reading progress
     let mut stmt = conn
@@ -321,7 +343,7 @@ fn export_sync_data(db: &State<'_, DbConn>) -> Result<SyncPayload, String> {
 }
 
 fn import_sync_data(db: &State<'_, DbConn>, payload: &SyncPayload) -> Result<(), String> {
-    let conn = db.conn.lock().map_err(|e| e.to_string())?;
+    let conn = db.conn.lock();
 
     // Import reading progress (upsert)
     for p in &payload.reading_progress {
@@ -419,7 +441,7 @@ fn sync_push_inner(db: &State<'_, DbConn>) -> Result<(), String> {
     let json = serde_json::to_string_pretty(&payload).map_err(|e| e.to_string())?;
     client.put("sync_data.json", json.as_bytes())?;
 
-    let conn = db.conn.lock().map_err(|e| e.to_string())?;
+    let conn = db.conn.lock();
     conn.execute("UPDATE sync_log SET synced = 1 WHERE synced = 0", [])
         .map_err(|e| e.to_string())?;
 
