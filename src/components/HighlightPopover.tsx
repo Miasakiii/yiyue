@@ -1,6 +1,7 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { HIGHLIGHT_COLORS } from "../constants";
+import { showToast } from "./Toast";
 
 interface DictMeaning {
   part_of_speech: string;
@@ -25,7 +26,10 @@ export function HighlightPopover({
   onCreated,
 }: HighlightPopoverProps) {
   const [visible, setVisible] = useState(false);
-  const [position, setPosition] = useState({ x: 0, y: 0 });
+  // Anchor: selection midpoint + top/bottom edges (viewport coords)
+  const [anchor, setAnchor] = useState({ x: 0, top: 0, bottom: 0 });
+  // Placement after measuring the popover (clamped to viewport, maybe flipped below)
+  const [placement, setPlacement] = useState<{ x: number; y: number; above: boolean } | null>(null);
   const [selectedText, setSelectedText] = useState("");
   const [startOffset, setStartOffset] = useState(0);
   const [endOffset, setEndOffset] = useState(0);
@@ -45,6 +49,7 @@ export function HighlightPopover({
         setTimeout(() => {
           if (!popoverRef.current?.contains(document.activeElement)) {
             setVisible(false);
+            setPlacement(null);
           }
         }, 200);
         return;
@@ -60,10 +65,12 @@ export function HighlightPopover({
       setSelectedText(text);
       setStartOffset(range.startOffset);
       setEndOffset(range.endOffset);
-      setPosition({
+      setAnchor({
         x: rect.left + rect.width / 2,
-        y: rect.top - 10,
+        top: rect.top - 10,
+        bottom: rect.bottom + 10,
       });
+      setPlacement(null);
       setVisible(true);
       setShowNoteInput(false);
       setNoteText("");
@@ -91,6 +98,24 @@ export function HighlightPopover({
     };
   }, [visible, showNoteInput, selectedText, startOffset, endOffset]);
 
+  // Measure the popover and clamp it into the viewport: 8px side margins,
+  // flip below the selection when there isn't enough room above.
+  useLayoutEffect(() => {
+    if (!visible) return;
+    const el = popoverRef.current;
+    if (!el) return;
+    const margin = 8;
+    const w = el.offsetWidth;
+    const h = el.offsetHeight;
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
+    const x = Math.min(Math.max(anchor.x, margin + w / 2), vw - margin - w / 2);
+    const fitsAbove = anchor.top - h >= margin;
+    const fitsBelow = anchor.bottom + h <= vh - margin;
+    const above = fitsAbove || !fitsBelow;
+    setPlacement({ x, y: above ? anchor.top : anchor.bottom, above });
+  }, [visible, anchor, showNoteInput, showDict, dictLoading, dictResult]);
+
   const createHighlight = async (color: string, note?: string) => {
     try {
       await invoke("create_annotation", {
@@ -108,6 +133,7 @@ export function HighlightPopover({
       });
 
       setVisible(false);
+      setPlacement(null);
       setShowNoteInput(false);
       setNoteText("");
       window.getSelection()?.removeAllRanges();
@@ -154,20 +180,24 @@ export function HighlightPopover({
   return (
     <div
       ref={popoverRef}
-      className="fixed z-50"
+      className="fixed"
       style={{
-        left: `${position.x}px`,
-        top: `${position.y}px`,
-        transform: "translate(-50%, -100%)",
+        zIndex: "var(--z-popover)",
+        left: `${placement ? placement.x : anchor.x}px`,
+        top: `${placement ? placement.y : anchor.top}px`,
+        transform: placement && !placement.above ? "translate(-50%, 0)" : "translate(-50%, -100%)",
+        visibility: placement ? "visible" : "hidden",
       }}
     >
+      <div className={placement ? "animate-scale-in" : undefined}>
       {showNoteInput ? (
         /* Note input panel */
         <div
-          className="rounded-lg shadow-xl p-3 w-72"
+          className="rounded-lg p-3 w-72"
           style={{
             background: "var(--bg-secondary)",
             border: "1px solid var(--border)",
+            boxShadow: "var(--shadow-xl)",
           }}
         >
           <div
@@ -213,10 +243,11 @@ export function HighlightPopover({
         /* Color picker */
         <div>
           <div
-            className="flex items-center gap-1 px-2 py-1.5 rounded-lg shadow-xl"
+            className="flex items-center gap-1 px-2 py-1.5 rounded-lg"
             style={{
               background: "var(--bg-secondary)",
               border: "1px solid var(--border)",
+              boxShadow: "var(--shadow-lg)",
             }}
           >
             {HIGHLIGHT_COLORS.map((c) => (
@@ -264,15 +295,48 @@ export function HighlightPopover({
                 </button>
               </>
             )}
+
+            {/* Copy button */}
+            <div className="w-px h-5 mx-0.5" style={{ background: "var(--border)" }} />
+            <button
+              className="w-6 h-6 rounded-md flex items-center justify-center hover:scale-110 transition-transform"
+              style={{ background: "var(--bg-tertiary)", color: "var(--text-tertiary)" }}
+              onClick={() => {
+                navigator.clipboard.writeText(selectedText);
+                showToast("已复制到剪贴板", "success");
+              }}
+              title="复制"
+            >
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+              </svg>
+            </button>
+
+            {/* Search button */}
+            <button
+              className="w-6 h-6 rounded-md flex items-center justify-center hover:scale-110 transition-transform"
+              style={{ background: "var(--bg-tertiary)", color: "var(--text-tertiary)" }}
+              onClick={() => {
+                window.dispatchEvent(new CustomEvent("search-with-text", { detail: { text: selectedText } }));
+              }}
+              title="在书中搜索"
+            >
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <circle cx="11" cy="11" r="8" />
+                <line x1="21" y1="21" x2="16.65" y2="16.65" />
+              </svg>
+            </button>
           </div>
 
           {/* Dictionary result panel */}
           {showDict && (
             <div
-              className="mt-1 rounded-lg shadow-xl px-3 py-2 w-72"
+              className="mt-1 rounded-lg px-3 py-2 w-72"
               style={{
                 background: "var(--bg-secondary)",
                 border: "1px solid var(--border)",
+                boxShadow: "var(--shadow-xl)",
               }}
             >
               {dictLoading ? (
@@ -306,6 +370,7 @@ export function HighlightPopover({
           )}
         </div>
       )}
+      </div>
     </div>
   );
 }

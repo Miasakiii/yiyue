@@ -1,7 +1,9 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
+import type { ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAppStore } from "../stores/app";
 import { BookCard } from "../components/BookCard";
+import { Button, Dialog, Input } from "../components/ui";
 import { SUPPORTED_EXTENSIONS } from "../constants";
 
 type SortKey = "recent" | "added" | "title" | "progress";
@@ -18,6 +20,65 @@ const SORT_OPTIONS: { key: SortKey; label: string }[] = [
   { key: "progress", label: "阅读进度" },
 ];
 
+const MORE_MENU: { label: string; path: string; icon: ReactNode }[] = [
+  {
+    label: "统计",
+    path: "/stats",
+    icon: (
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+        <path d="M18 20V10M12 20V4M6 20v-6" />
+      </svg>
+    ),
+  },
+  {
+    label: "同步",
+    path: "/sync",
+    icon: (
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+        <path d="M21 12a9 9 0 0 1-9 9m9-9a9 9 0 0 0-9-9m9 9H3m9 9a9 9 0 0 1-9-9m9 9c1.66 0 3-4.03 3-9s-1.34-9-3-9m0 18c-1.66 0-3-4.03-3-9s1.34-9 3-9" />
+      </svg>
+    ),
+  },
+  {
+    label: "规则",
+    path: "/rules",
+    icon: (
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+        <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
+        <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
+      </svg>
+    ),
+  },
+  {
+    label: "OPDS",
+    path: "/opds",
+    icon: (
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+        <path d="M4 11a9 9 0 0 1 9 9M4 4a16 16 0 0 1 16 16" />
+        <circle cx="5" cy="19" r="1" />
+      </svg>
+    ),
+  },
+  {
+    label: "传输",
+    path: "/transfer",
+    icon: (
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12" />
+      </svg>
+    ),
+  },
+];
+
+/** Uniform linear icon for groups (replaces per-group emoji). */
+function GroupIcon({ size = 15 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+      <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
+    </svg>
+  );
+}
+
 export function Library() {
   const navigate = useNavigate();
   const {
@@ -32,13 +93,24 @@ export function Library() {
     return localStorage.getItem("sidebar-collapsed") === "true";
   });
 
+  // Starred-only filter is not tracked in the store, keep it local
+  const [starredOnly, setStarredOnly] = useState(false);
+
+  // Header "more" dropdown
+  const [showMoreMenu, setShowMoreMenu] = useState(false);
+  const moreRef = useRef<HTMLDivElement>(null);
+
   // New tag/group dialog state
   const [showTagDialog, setShowTagDialog] = useState(false);
   const [newTagName, setNewTagName] = useState("");
   const [newTagColor, setNewTagColor] = useState(TAG_COLORS[0]);
   const [showGroupDialog, setShowGroupDialog] = useState(false);
   const [newGroupName, setNewGroupName] = useState("");
-  const [newGroupIcon, setNewGroupIcon] = useState("📁");
+
+  // Sidebar delete confirmation
+  const [confirmDelete, setConfirmDelete] = useState<
+    { kind: "tag" | "group"; id: string; name: string } | null
+  >(null);
 
   // Load tags and groups on mount
   useEffect(() => {
@@ -50,6 +122,18 @@ export function Library() {
   useEffect(() => {
     localStorage.setItem("sidebar-collapsed", String(sidebarCollapsed));
   }, [sidebarCollapsed]);
+
+  // Close "more" menu on outside click
+  useEffect(() => {
+    if (!showMoreMenu) return;
+    const close = (e: MouseEvent) => {
+      if (moreRef.current && !moreRef.current.contains(e.target as Node)) {
+        setShowMoreMenu(false);
+      }
+    };
+    window.addEventListener("mousedown", close);
+    return () => window.removeEventListener("mousedown", close);
+  }, [showMoreMenu]);
 
   const [importError, setImportError] = useState<string | null>(null);
   const [isDragging, setIsDragging] = useState(false);
@@ -164,13 +248,40 @@ export function Library() {
 
   const handleCreateGroup = async () => {
     if (!newGroupName.trim()) return;
-    await createGroup(newGroupName.trim(), newGroupIcon);
+    await createGroup(newGroupName.trim());
     setNewGroupName("");
-    setNewGroupIcon("📁");
     setShowGroupDialog(false);
   };
 
+  const handleConfirmDelete = async () => {
+    if (!confirmDelete) return;
+    if (confirmDelete.kind === "tag") {
+      await deleteTag(confirmDelete.id);
+    } else {
+      await deleteGroup(confirmDelete.id);
+    }
+    setConfirmDelete(null);
+  };
+
+  const showStarred = () => {
+    setActiveTag(null);
+    setActiveGroup(null);
+    setStarredOnly(true);
+    loadBooks({ starred: true });
+  };
+
+  const selectTag = (name: string | null) => {
+    setStarredOnly(false);
+    setActiveTag(name);
+  };
+
+  const selectGroup = (id: string | null) => {
+    setStarredOnly(false);
+    setActiveGroup(id);
+  };
+
   const clearFilter = () => {
+    setStarredOnly(false);
     setActiveTag(null);
     setActiveGroup(null);
     loadBooks({});
@@ -185,23 +296,25 @@ export function Library() {
       case "title":
         return a.title.localeCompare(b.title, "zh");
       case "progress":
+        // Descending: most-read first
         return (b.reading_percentage || 0) - (a.reading_percentage || 0);
       default:
         return 0;
     }
   });
 
-  const hasActiveFilter = activeTag !== null || activeGroup !== null;
+  const hasActiveFilter = activeTag !== null || activeGroup !== null || starredOnly;
 
   return (
     <div className="flex h-screen relative" style={{ background: "var(--bg-primary)", color: "var(--text-primary)" }}>
       {/* Drag overlay */}
       {isDragging && (
         <div
-          className="fixed inset-0 z-[200] flex items-center justify-center pointer-events-none animate-fade-in"
+          className="fixed inset-0 flex items-center justify-center pointer-events-none animate-fade-in"
           style={{
-            background: "rgba(99, 102, 241, 0.08)",
+            background: "var(--accent-soft)",
             backdropFilter: "blur(2px)",
+            zIndex: "var(--z-toast)",
           }}
         >
           <div
@@ -219,7 +332,7 @@ export function Library() {
             </svg>
             <div className="text-base font-medium">释放鼠标以导入</div>
             <div className="text-xs" style={{ color: "var(--text-tertiary)" }}>
-              支持 TXT / EPUB / PDF / MD / CBZ
+              支持 TXT / EPUB / PDF / MD / CBZ / DOCX
             </div>
           </div>
         </div>
@@ -228,22 +341,34 @@ export function Library() {
       {/* Importing progress */}
       {importing && importProgress && (
         <div
-          className="fixed bottom-6 right-6 z-[150] flex items-center gap-3 px-4 py-3 rounded-xl animate-slide-up"
+          className="fixed bottom-6 right-6 px-4 py-3 rounded-xl animate-slide-up"
           style={{
             background: "var(--bg-elevated)",
             border: "1px solid var(--border)",
             boxShadow: "var(--shadow-lg)",
+            zIndex: "var(--z-toast)",
           }}
         >
-          <div
-            className="w-4 h-4 rounded-full border-2 border-t-transparent animate-spin"
-            style={{ borderColor: "var(--accent)", borderTopColor: "transparent" }}
-          />
-          <div className="text-xs">
-            正在导入 {importProgress.current}/{importProgress.total}
+          <div className="flex items-center gap-3">
+            <div
+              className="w-4 h-4 rounded-full border-2 border-t-transparent animate-spin"
+              style={{ borderColor: "var(--accent)", borderTopColor: "transparent" }}
+            />
+            <div className="text-xs">
+              正在导入 {importProgress.current}/{importProgress.total}
+            </div>
+          </div>
+          <div className="progress-bar mt-2.5" style={{ width: 180 }}>
+            <div
+              className="progress-bar-fill"
+              style={{
+                width: `${importProgress.total > 0 ? (importProgress.current / importProgress.total) * 100 : 0}%`,
+              }}
+            />
           </div>
         </div>
       )}
+
       {/* Sidebar */}
       <aside
         className="flex-shrink-0 flex flex-col overflow-hidden transition-all"
@@ -261,7 +386,7 @@ export function Library() {
             </span>
           )}
           <button
-            className="p-1 rounded-md hover:bg-[var(--bg-tertiary)]"
+            className="p-1 rounded-md hover-bg"
             onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
             title={sidebarCollapsed ? "展开侧边栏" : "折叠侧边栏"}
           >
@@ -292,36 +417,29 @@ export function Library() {
                 <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
               </svg>}
               label="收藏"
-              active={false}
-              onClick={() => {
-                setActiveTag(null);
-                setActiveGroup(null);
-                loadBooks({ starred: true });
-              }}
+              active={starredOnly}
+              onClick={showStarred}
             />
             <div className="w-6 h-px my-1" style={{ background: "var(--border)" }} />
-            {/* Tag icons */}
-            {tags.slice(0, 8).map((tag) => (
+            {/* Tag icons — full list, scrollable */}
+            {tags.map((tag) => (
               <SidebarIcon
                 key={tag.id}
                 icon={<div className="w-3 h-3 rounded-full" style={{ background: tag.color }} />}
                 label={tag.name}
                 active={activeTag === tag.name}
-                onClick={() => setActiveTag(activeTag === tag.name ? null : tag.name)}
+                onClick={() => selectTag(activeTag === tag.name ? null : tag.name)}
               />
             ))}
-            {tags.length > 8 && (
-              <span className="text-[10px] mt-0.5" style={{ color: "var(--text-tertiary)" }}>+{tags.length - 8}</span>
-            )}
             <div className="w-6 h-px my-1" style={{ background: "var(--border)" }} />
-            {/* Group icons */}
-            {groups.slice(0, 6).map((group) => (
+            {/* Group icons — full list, scrollable */}
+            {groups.map((group) => (
               <SidebarIcon
                 key={group.id}
-                icon={<span className="text-sm">{group.icon || "📁"}</span>}
+                icon={<GroupIcon size={15} />}
                 label={group.name}
                 active={activeGroup === group.id}
-                onClick={() => setActiveGroup(activeGroup === group.id ? null : group.id)}
+                onClick={() => selectGroup(activeGroup === group.id ? null : group.id)}
               />
             ))}
           </div>
@@ -347,12 +465,8 @@ export function Library() {
                   </svg>
                 }
                 label="收藏"
-                active={false}
-                onClick={() => {
-                  setActiveTag(null);
-                  setActiveGroup(null);
-                  loadBooks({ starred: true });
-                }}
+                active={starredOnly}
+                onClick={showStarred}
               />
             </div>
 
@@ -363,7 +477,7 @@ export function Library() {
                   标签
                 </span>
                 <button
-                  className="p-0.5 rounded hover:bg-[var(--bg-tertiary)]"
+                  className="p-0.5 rounded hover-bg"
                   style={{ color: "var(--text-tertiary)" }}
                   onClick={() => setShowTagDialog(true)}
                   title="新建标签"
@@ -390,8 +504,8 @@ export function Library() {
                     }
                     label={tag.name}
                     active={activeTag === tag.name}
-                    onClick={() => setActiveTag(activeTag === tag.name ? null : tag.name)}
-                    onDelete={() => deleteTag(tag.id)}
+                    onClick={() => selectTag(activeTag === tag.name ? null : tag.name)}
+                    onDelete={() => setConfirmDelete({ kind: "tag", id: tag.id, name: tag.name })}
                   />
                 ))
               )}
@@ -404,7 +518,7 @@ export function Library() {
                   分组
                 </span>
                 <button
-                  className="p-0.5 rounded hover:bg-[var(--bg-tertiary)]"
+                  className="p-0.5 rounded hover-bg"
                   style={{ color: "var(--text-tertiary)" }}
                   onClick={() => setShowGroupDialog(true)}
                   title="新建分组"
@@ -424,12 +538,14 @@ export function Library() {
                   <SidebarItem
                     key={group.id}
                     icon={
-                      <span className="text-sm flex-shrink-0">{group.icon || "📁"}</span>
+                      <span className="flex-shrink-0 flex items-center" style={{ color: "var(--text-tertiary)" }}>
+                        <GroupIcon />
+                      </span>
                     }
                     label={group.name}
                     active={activeGroup === group.id}
-                    onClick={() => setActiveGroup(activeGroup === group.id ? null : group.id)}
-                    onDelete={() => deleteGroup(group.id)}
+                    onClick={() => selectGroup(activeGroup === group.id ? null : group.id)}
+                    onDelete={() => setConfirmDelete({ kind: "group", id: group.id, name: group.name })}
                   />
                 ))
               )}
@@ -474,6 +590,7 @@ export function Library() {
                 }}
                 onClick={clearFilter}
               >
+                {starredOnly && "收藏"}
                 {activeTag && `标签: ${activeTag}`}
                 {activeGroup && `分组: ${groups.find((g) => g.id === activeGroup)?.name || activeGroup}`}
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
@@ -541,70 +658,62 @@ export function Library() {
               </button>
             </div>
 
-            {/* Stats button */}
-            <button
-              className="px-3 py-1.5 rounded-lg text-xs flex items-center gap-1.5"
-              style={{
-                color: "var(--text-secondary)",
-                border: "1px solid var(--border)",
-                background: "var(--bg-secondary)",
-              }}
-              onClick={() => navigate("/stats")}
-            >
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <path d="M18 20V10M12 20V4M6 20v-6" />
+            {/* More menu */}
+            <div className="relative" ref={moreRef}>
+              <Button variant="secondary" size="sm" onClick={() => setShowMoreMenu((v) => !v)}>
+                更多
+                <svg
+                  width="12"
+                  height="12"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  style={{
+                    transform: showMoreMenu ? "rotate(180deg)" : "none",
+                    transition: "transform var(--transition-fast)",
+                  }}
+                >
+                  <polyline points="6 9 12 15 18 9" />
                 </svg>
-                 统计
-              </button>
-
-            {/* Sync button */}
-            <button
-              className="px-3 py-1.5 rounded-lg text-xs flex items-center gap-1.5"
-              style={{
-                color: "var(--text-secondary)",
-                border: "1px solid var(--border)",
-                background: "var(--bg-secondary)",
-              }}
-              onClick={() => navigate("/sync")}
-            >
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <path d="M21 12a9 9 0 0 1-9 9m9-9a9 9 0 0 0-9-9m9 9H3m9 9a9 9 0 0 1-9-9m9 9c1.66 0 3-4.03 3-9s-1.34-9-3-9m0 18c-1.66 0-3-4.03-3-9s1.34-9 3-9" />
-                </svg>
-                 同步
-              </button>
-
-            {/* Rules button */}
-            <button
-              className="px-3 py-1.5 rounded-lg text-xs flex items-center gap-1.5"
-              style={{
-                color: "var(--text-secondary)",
-                border: "1px solid var(--border)",
-                background: "var(--bg-secondary)",
-              }}
-              onClick={() => navigate("/rules")}
-            >
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
-                <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
-              </svg>
-              规则
-            </button>
+              </Button>
+              {showMoreMenu && (
+                <div
+                  className="absolute right-0 top-full mt-1.5 rounded-lg overflow-hidden animate-scale-in py-1"
+                  style={{
+                    background: "var(--bg-elevated)",
+                    border: "1px solid var(--border)",
+                    boxShadow: "var(--shadow-lg)",
+                    zIndex: "var(--z-popover)",
+                    minWidth: 132,
+                  }}
+                >
+                  {MORE_MENU.map((item) => (
+                    <button
+                      key={item.path}
+                      className="w-full flex items-center gap-2.5 px-3 py-2 text-xs hover-bg"
+                      style={{ color: "var(--text-secondary)" }}
+                      onClick={() => {
+                        setShowMoreMenu(false);
+                        navigate(item.path);
+                      }}
+                    >
+                      {item.icon}
+                      {item.label}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
 
             {/* Import button */}
-            <button
-              className="px-4 py-1.5 rounded-lg text-xs font-medium text-white flex items-center gap-1.5 transition-all"
-              style={{
-                background: "linear-gradient(135deg, var(--accent), var(--accent-hover))",
-                boxShadow: "0 2px 8px rgba(99, 102, 241, 0.3)",
-              }}
-              onClick={handleImport}
-            >
+            <Button size="sm" onClick={handleImport}>
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
                 <line x1="12" y1="5" x2="12" y2="19" />
                 <line x1="5" y1="12" x2="19" y2="12" />
               </svg>
               导入
-            </button>
+            </Button>
           </div>
         </header>
 
@@ -613,13 +722,11 @@ export function Library() {
           {/* Error toast */}
           {importError && (
             <div
-              className="absolute top-4 left-1/2 -translate-x-1/2 z-[60] px-4 py-2.5 rounded-lg text-xs animate-slide-down"
+              className="absolute top-4 left-1/2 -translate-x-1/2 px-4 py-2.5 rounded-lg text-xs animate-slide-down toast-error"
               style={{
-                background: "var(--bg-elevated)",
-                border: "1px solid #ef4444",
-                color: "#ef4444",
                 boxShadow: "var(--shadow-lg)",
                 maxWidth: 400,
+                zIndex: "var(--z-toast)",
               }}
             >
               <div className="flex items-center gap-2">
@@ -630,7 +737,7 @@ export function Library() {
                 </svg>
                 <span>{importError}</span>
                 <button
-                  className="ml-2 p-0.5 rounded hover:bg-[var(--bg-tertiary)]"
+                  className="ml-2 p-0.5 rounded hover:opacity-70"
                   onClick={() => setImportError(null)}
                 >
                   <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -679,7 +786,7 @@ export function Library() {
               </div>
               {!hasActiveFilter && (
                 <div className="flex gap-2 mt-1">
-                  {["TXT", "EPUB", "PDF", "MD", "CBZ"].map((fmt) => (
+                  {["TXT", "EPUB", "PDF", "MD", "CBZ", "DOCX"].map((fmt) => (
                     <span
                       key={fmt}
                       className="text-xs px-2.5 py-1 rounded-md"
@@ -700,7 +807,7 @@ export function Library() {
               className={
                 viewMode === "grid"
                   ? "grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-5"
-                  : "flex flex-col gap-2 max-w-3xl mx-auto"
+                  : "flex flex-col gap-2"
               }
             >
               {sortedBooks.map((book, i) => (
@@ -718,145 +825,113 @@ export function Library() {
       </div>
 
       {/* Create Tag Dialog */}
-      {showTagDialog && (
-        <Dialog title="新建标签" onClose={() => setShowTagDialog(false)}>
-          <div className="flex flex-col gap-4">
-            <div>
-              <label className="text-xs font-medium mb-1.5 block" style={{ color: "var(--text-secondary)" }}>
-                标签名称
-              </label>
-              <input
-                type="text"
-                className="w-full px-3 py-2 text-sm rounded-lg outline-none"
-                style={{
-                  background: "var(--bg-tertiary)",
-                  border: "1px solid var(--border)",
-                  color: "var(--text-primary)",
-                }}
-                placeholder="输入标签名称"
-                value={newTagName}
-                onChange={(e) => setNewTagName(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && handleCreateTag()}
-                autoFocus
-              />
-            </div>
-            <div>
-              <label className="text-xs font-medium mb-1.5 block" style={{ color: "var(--text-secondary)" }}>
-                颜色
-              </label>
-              <div className="flex gap-2">
-                {TAG_COLORS.map((color) => (
-                  <button
-                    key={color}
-                    className="w-7 h-7 rounded-full transition-all"
-                    style={{
-                      background: color,
-                      outline: newTagColor === color ? `2px solid ${color}` : "none",
-                      outlineOffset: "2px",
-                    }}
-                    onClick={() => setNewTagColor(color)}
-                  />
-                ))}
-              </div>
-            </div>
-            <div className="flex justify-end gap-2 mt-2">
-              <button
-                className="px-4 py-1.5 text-xs rounded-lg"
-                style={{
-                  background: "var(--bg-tertiary)",
-                  color: "var(--text-secondary)",
-                  border: "1px solid var(--border)",
-                }}
-                onClick={() => setShowTagDialog(false)}
-              >
-                取消
-              </button>
-              <button
-                className="px-4 py-1.5 text-xs rounded-lg text-white font-medium"
-                style={{
-                  background: "var(--accent)",
-                  opacity: newTagName.trim() ? 1 : 0.5,
-                }}
-                onClick={handleCreateTag}
-                disabled={!newTagName.trim()}
-              >
-                创建
-              </button>
+      <Dialog
+        open={showTagDialog}
+        onClose={() => setShowTagDialog(false)}
+        title="新建标签"
+        footer={
+          <>
+            <Button variant="secondary" size="sm" onClick={() => setShowTagDialog(false)}>
+              取消
+            </Button>
+            <Button size="sm" onClick={handleCreateTag} disabled={!newTagName.trim()}>
+              创建
+            </Button>
+          </>
+        }
+      >
+        <div className="flex flex-col gap-4">
+          <div>
+            <label className="text-xs font-medium mb-1.5 block" style={{ color: "var(--text-secondary)" }}>
+              标签名称
+            </label>
+            <Input
+              placeholder="输入标签名称"
+              value={newTagName}
+              onChange={(e) => setNewTagName(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && handleCreateTag()}
+              autoFocus
+            />
+          </div>
+          <div>
+            <label className="text-xs font-medium mb-1.5 block" style={{ color: "var(--text-secondary)" }}>
+              颜色
+            </label>
+            <div className="flex gap-2">
+              {TAG_COLORS.map((color) => (
+                <button
+                  key={color}
+                  className="w-7 h-7 rounded-full transition-all"
+                  style={{
+                    background: color,
+                    outline: newTagColor === color ? `2px solid ${color}` : "none",
+                    outlineOffset: "2px",
+                  }}
+                  onClick={() => setNewTagColor(color)}
+                />
+              ))}
             </div>
           </div>
-        </Dialog>
-      )}
+        </div>
+      </Dialog>
 
       {/* Create Group Dialog */}
-      {showGroupDialog && (
-        <Dialog title="新建分组" onClose={() => setShowGroupDialog(false)}>
-          <div className="flex flex-col gap-4">
-            <div>
-              <label className="text-xs font-medium mb-1.5 block" style={{ color: "var(--text-secondary)" }}>
-                分组名称
-              </label>
-              <input
-                type="text"
-                className="w-full px-3 py-2 text-sm rounded-lg outline-none"
-                style={{
-                  background: "var(--bg-tertiary)",
-                  border: "1px solid var(--border)",
-                  color: "var(--text-primary)",
-                }}
-                placeholder="输入分组名称"
-                value={newGroupName}
-                onChange={(e) => setNewGroupName(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && handleCreateGroup()}
-                autoFocus
-              />
-            </div>
-            <div>
-              <label className="text-xs font-medium mb-1.5 block" style={{ color: "var(--text-secondary)" }}>
-                图标
-              </label>
-              <div className="flex gap-2 flex-wrap">
-                {["📁", "📚", "📖", "📕", "📗", "📘", "📙", "📓", "📔", "📒", "🔖", "⭐", "❤️", "🎯", "💡", "🔥"].map((emoji) => (
-                  <button
-                    key={emoji}
-                    className="w-8 h-8 rounded-lg flex items-center justify-center text-lg transition-all"
-                    style={{
-                      background: newGroupIcon === emoji ? "var(--accent-soft)" : "var(--bg-tertiary)",
-                      border: newGroupIcon === emoji ? "1px solid var(--accent)" : "1px solid var(--border)",
-                    }}
-                    onClick={() => setNewGroupIcon(emoji)}
-                  >
-                    {emoji}
-                  </button>
-                ))}
-              </div>
-            </div>
-            <div className="flex justify-end gap-2 mt-2">
-              <button
-                className="px-4 py-1.5 text-xs rounded-lg"
-                style={{
-                  background: "var(--bg-tertiary)",
-                  color: "var(--text-secondary)",
-                  border: "1px solid var(--border)",
-                }}
-                onClick={() => setShowGroupDialog(false)}
-              >
-                取消
-              </button>
-              <button
-                className="px-4 py-1.5 text-xs rounded-lg text-white font-medium"
-                style={{
-                  background: "var(--accent)",
-                  opacity: newGroupName.trim() ? 1 : 0.5,
-                }}
-                onClick={handleCreateGroup}
-                disabled={!newGroupName.trim()}
-              >
-                创建
-              </button>
-            </div>
-          </div>
-        </Dialog>
-      )}
+      <Dialog
+        open={showGroupDialog}
+        onClose={() => setShowGroupDialog(false)}
+        title="新建分组"
+        footer={
+          <>
+            <Button variant="secondary" size="sm" onClick={() => setShowGroupDialog(false)}>
+              取消
+            </Button>
+            <Button size="sm" onClick={handleCreateGroup} disabled={!newGroupName.trim()}>
+              创建
+            </Button>
+          </>
+        }
+      >
+        <div>
+          <label className="text-xs font-medium mb-1.5 block" style={{ color: "var(--text-secondary)" }}>
+            分组名称
+          </label>
+          <Input
+            placeholder="输入分组名称"
+            value={newGroupName}
+            onChange={(e) => setNewGroupName(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && handleCreateGroup()}
+            autoFocus
+          />
+        </div>
+      </Dialog>
+
+      {/* Delete tag/group confirmation */}
+      <Dialog
+        open={confirmDelete !== null}
+        onClose={() => setConfirmDelete(null)}
+        title={confirmDelete?.kind === "tag" ? "删除标签" : "删除分组"}
+        footer={
+          <>
+            <Button variant="secondary" size="sm" onClick={() => setConfirmDelete(null)}>
+              取消
+            </Button>
+            <Button
+              size="sm"
+              style={{ background: "var(--error)", boxShadow: "none" }}
+              onClick={handleConfirmDelete}
+            >
+              删除
+            </Button>
+          </>
+        }
+      >
+        <div className="text-sm" style={{ color: "var(--text-secondary)" }}>
+          确定删除{confirmDelete?.kind === "tag" ? "标签" : "分组"}「{confirmDelete?.name}」吗？
+          {confirmDelete?.kind === "tag"
+            ? "相关书籍上的该标签会一并移除。"
+            : "分组内的书籍不会被删除。"}
+        </div>
+      </Dialog>
     </div>
   );
 }
@@ -869,30 +944,26 @@ function SidebarItem({
   onClick,
   onDelete,
 }: {
-  icon: React.ReactNode;
+  icon: ReactNode;
   label: string;
   active: boolean;
   onClick: () => void;
   onDelete?: () => void;
 }) {
-  const [showDelete, setShowDelete] = useState(false);
-
   return (
     <div
-      className="flex items-center gap-2 px-2 py-1.5 rounded-lg cursor-pointer group transition-all"
+      className="flex items-center gap-2 px-2 py-1.5 rounded-lg cursor-pointer group transition-all hover-bg"
       style={{
-        background: active ? "var(--accent-soft)" : "transparent",
+        background: active ? "var(--accent-soft)" : undefined,
         color: active ? "var(--accent)" : "var(--text-secondary)",
       }}
       onClick={onClick}
-      onMouseEnter={() => setShowDelete(true)}
-      onMouseLeave={() => setShowDelete(false)}
     >
       {icon}
       <span className="text-xs truncate flex-1">{label}</span>
-      {onDelete && showDelete && (
+      {onDelete && (
         <button
-          className="p-0.5 rounded hover:bg-[var(--bg-tertiary)] opacity-60 hover:opacity-100"
+          className="p-0.5 rounded hover-bg opacity-0 group-hover:opacity-100 transition-opacity"
           onClick={(e) => {
             e.stopPropagation();
             onDelete();
@@ -916,62 +987,23 @@ function SidebarIcon({
   active,
   onClick,
 }: {
-  icon: React.ReactNode;
+  icon: ReactNode;
   label: string;
   active: boolean;
   onClick: () => void;
 }) {
+  // Note: active background is inline so it wins over .hover-bg on hover
   return (
     <button
-      className="w-9 h-9 rounded-lg flex items-center justify-center transition-all"
+      className="w-9 h-9 rounded-lg flex items-center justify-center transition-all hover-bg"
       style={{
-        background: active ? "var(--accent-soft)" : "transparent",
+        background: active ? "var(--accent-soft)" : undefined,
         color: active ? "var(--accent)" : "var(--text-tertiary)",
       }}
       onClick={onClick}
       title={label}
-      onMouseEnter={(e) => {
-        if (!active) e.currentTarget.style.background = "var(--bg-tertiary)";
-      }}
-      onMouseLeave={(e) => {
-        if (!active) e.currentTarget.style.background = "transparent";
-      }}
     >
       {icon}
     </button>
-  );
-}
-
-// Dialog component
-function Dialog({
-  title,
-  children,
-  onClose,
-}: {
-  title: string;
-  children: React.ReactNode;
-  onClose: () => void;
-}) {
-  return (
-    <div
-      className="fixed inset-0 z-[100] flex items-center justify-center"
-      style={{ background: "rgba(0,0,0,0.4)", backdropFilter: "blur(4px)" }}
-      onClick={onClose}
-    >
-      <div
-        className="rounded-xl p-5 animate-scale-in"
-        style={{
-          background: "var(--bg-elevated)",
-          border: "1px solid var(--border)",
-          boxShadow: "var(--shadow-xl)",
-          minWidth: 320,
-          maxWidth: "90vw",
-        }}
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="text-sm font-semibold mb-4">{title}</div>
-        {children}
-      </div>
-    </div>
   );
 }

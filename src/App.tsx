@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Routes, Route, Navigate, useNavigate } from "react-router-dom";
 import { useAppStore } from "./stores/app";
 import { Library } from "./pages/Library";
@@ -7,6 +7,8 @@ import { ComicReader } from "./pages/ComicReader";
 import { Stats } from "./pages/Stats";
 import { SyncSettings } from "./pages/SyncSettings";
 import { Rules } from "./pages/Rules";
+import { OpdsSettings } from "./pages/OpdsSettings";
+import { LanTransfer } from "./pages/LanTransfer";
 import { SearchPanel } from "./components/SearchPanel";
 import { ToastContainer } from "./components/Toast";
 import "./App.css";
@@ -15,6 +17,7 @@ function App() {
   const { currentBook, loadBooks } = useAppStore();
   const navigate = useNavigate();
   const [showSearch, setShowSearch] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
 
   useEffect(() => {
     loadBooks().catch((e) => {
@@ -48,11 +51,26 @@ function App() {
     return () => window.removeEventListener("open-search", handleOpenSearch);
   }, []);
 
-  // Auto-navigate to reader when book is opened, back to library when closed
+  // Listen for search-with-text event from HighlightPopover
   useEffect(() => {
-    if (currentBook) {
+    const handleSearchWithText = (e: CustomEvent<{ text: string }>) => {
+      setSearchQuery(e.detail?.text || "");
+      setShowSearch(true);
+    };
+    window.addEventListener("search-with-text", handleSearchWithText as EventListener);
+    return () => window.removeEventListener("search-with-text", handleSearchWithText as EventListener);
+  }, []);
+
+  // Auto-navigate to reader when a book is opened, back to library when closed.
+  // Only reacts to actual transitions (tracked via ref) so deep links like
+  // opening /stats directly are not kicked back to the library on mount.
+  const prevBookRef = useRef(currentBook);
+  useEffect(() => {
+    const prev = prevBookRef.current;
+    prevBookRef.current = currentBook;
+    if (!prev && currentBook) {
       navigate("/reader");
-    } else {
+    } else if (prev && !currentBook) {
       navigate("/");
     }
   }, [currentBook, navigate]);
@@ -66,6 +84,8 @@ function App() {
         <Route path="/stats" element={<Stats />} />
         <Route path="/sync" element={<SyncSettings />} />
         <Route path="/rules" element={<Rules />} />
+        <Route path="/opds" element={<OpdsSettings />} />
+        <Route path="/transfer" element={<LanTransfer />} />
         <Route
           path="/reader"
           element={
@@ -80,7 +100,8 @@ function App() {
       </Routes>
       <SearchPanel
         visible={showSearch}
-        onClose={() => setShowSearch(false)}
+        onClose={() => { setShowSearch(false); setSearchQuery(""); }}
+        query={searchQuery}
       />
       <ToastContainer />
     </>

@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
 import { invoke } from "@tauri-apps/api/core";
+import { PageHeader, Button, Input, Switch } from "../components/ui";
 
 interface WebDavConfig {
   server_url: string;
@@ -19,7 +19,6 @@ interface SyncStatus {
 }
 
 export function SyncSettings() {
-  const navigate = useNavigate();
   const [config, setConfig] = useState<WebDavConfig>({
     server_url: "",
     username: "",
@@ -93,55 +92,16 @@ export function SyncSettings() {
     }
   };
 
-  const inputStyle: React.CSSProperties = {
-    background: "var(--bg-primary)",
-    color: "var(--text-primary)",
-    border: "1px solid var(--border)",
-    borderRadius: "var(--radius-sm)",
-    padding: "8px 12px",
-    fontSize: "13px",
-    outline: "none",
-    transition: "border-color var(--transition-fast)",
-    width: "100%",
-  };
-
   return (
     <div
       className="flex flex-col h-screen"
       style={{ background: "var(--bg-primary)", color: "var(--text-primary)" }}
     >
-      {/* Header */}
-      <header
-        className="flex items-center justify-between px-8 py-5 flex-shrink-0"
-        style={{
-          borderBottom: "1px solid var(--border)",
-          background: "var(--bg-elevated)",
-        }}
-      >
-        <div className="flex items-center gap-3">
-          <button
-            className="px-2.5 py-1.5 rounded-lg text-sm flex items-center gap-1.5"
-            style={{ color: "var(--text-secondary)" }}
-            onClick={() => navigate("/")}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.background = "var(--bg-tertiary)";
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.background = "transparent";
-            }}
-          >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M19 12H5M12 19l-7-7 7-7" />
-            </svg>
-            返回
-          </button>
-          <h1 className="text-lg font-semibold">同步设置</h1>
-        </div>
-      </header>
+      <PageHeader title="同步设置" />
 
       {/* Content */}
       <main className="flex-1 overflow-y-auto p-8">
-        <div className="max-w-2xl mx-auto space-y-5 animate-fade-in">
+        <div className="max-w-4xl mx-auto space-y-5 animate-fade-in">
           {/* Status card */}
           <div
             className="rounded-xl p-5"
@@ -178,19 +138,10 @@ export function SyncSettings() {
             </div>
 
             <div className="flex gap-2">
-              <button
-                className="px-4 py-2 rounded-lg text-sm font-medium text-white flex items-center gap-1.5"
-                style={{
-                  background: "linear-gradient(135deg, var(--accent), var(--accent-hover))",
-                  boxShadow: "0 2px 8px rgba(99, 102, 241, 0.3)",
-                  opacity: syncing ? 0.7 : 1,
-                }}
-                onClick={() => handleSync("full")}
-                disabled={syncing}
-              >
+              <Button onClick={() => handleSync("full")} disabled={syncing}>
                 {syncing ? (
                   <>
-                    <div className="w-3.5 h-3.5 rounded-full border-2 border-white border-t-transparent animate-spin" />
+                    <span className="inline-block w-3.5 h-3.5 rounded-full border-2 border-white border-t-transparent animate-spin" />
                     同步中...
                   </>
                 ) : (
@@ -201,43 +152,25 @@ export function SyncSettings() {
                     立即同步
                   </>
                 )}
-              </button>
-              <button
-                className="px-4 py-2 rounded-lg text-sm flex items-center gap-1.5"
-                style={{
-                  color: "var(--text-secondary)",
-                  border: "1px solid var(--border)",
-                  background: "var(--bg-secondary)",
-                }}
-                onClick={() => handleSync("push")}
-                disabled={syncing}
-              >
+              </Button>
+              <Button variant="secondary" onClick={() => handleSync("push")} disabled={syncing}>
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                   <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12" />
                 </svg>
                 上传
-              </button>
-              <button
-                className="px-4 py-2 rounded-lg text-sm flex items-center gap-1.5"
-                style={{
-                  color: "var(--text-secondary)",
-                  border: "1px solid var(--border)",
-                  background: "var(--bg-secondary)",
-                }}
-                onClick={() => handleSync("pull")}
-                disabled={syncing}
-              >
+              </Button>
+              <Button variant="secondary" onClick={() => handleSync("pull")} disabled={syncing}>
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                   <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3" />
                 </svg>
                 下载
-              </button>
+              </Button>
             </div>
 
             {syncMessage && (
               <div
                 className="mt-3 text-sm flex items-center gap-1.5"
-                style={{ color: syncMessage.includes("失败") ? "#ef4444" : "#22c55e" }}
+                style={{ color: syncMessage.includes("失败") ? "var(--error)" : "var(--success)" }}
               >
                 {syncMessage.includes("失败") ? (
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -276,18 +209,11 @@ export function SyncSettings() {
                 <label className="block text-xs font-medium mb-1.5" style={{ color: "var(--text-secondary)" }}>
                   服务器地址
                 </label>
-                <input
+                <Input
                   type="text"
-                  style={inputStyle}
                   placeholder="https://dav.example.com"
                   value={config.server_url}
                   onChange={(e) => setConfig({ ...config, server_url: e.target.value })}
-                  onFocus={(e) => {
-                    e.currentTarget.style.borderColor = "var(--accent)";
-                  }}
-                  onBlur={(e) => {
-                    e.currentTarget.style.borderColor = "var(--border)";
-                  }}
                 />
               </div>
 
@@ -296,34 +222,20 @@ export function SyncSettings() {
                   <label className="block text-xs font-medium mb-1.5" style={{ color: "var(--text-secondary)" }}>
                     用户名
                   </label>
-                  <input
+                  <Input
                     type="text"
-                    style={inputStyle}
                     value={config.username}
                     onChange={(e) => setConfig({ ...config, username: e.target.value })}
-                    onFocus={(e) => {
-                      e.currentTarget.style.borderColor = "var(--accent)";
-                    }}
-                    onBlur={(e) => {
-                      e.currentTarget.style.borderColor = "var(--border)";
-                    }}
                   />
                 </div>
                 <div>
                   <label className="block text-xs font-medium mb-1.5" style={{ color: "var(--text-secondary)" }}>
                     密码
                   </label>
-                  <input
+                  <Input
                     type="password"
-                    style={inputStyle}
                     value={config.password}
                     onChange={(e) => setConfig({ ...config, password: e.target.value })}
-                    onFocus={(e) => {
-                      e.currentTarget.style.borderColor = "var(--accent)";
-                    }}
-                    onBlur={(e) => {
-                      e.currentTarget.style.borderColor = "var(--border)";
-                    }}
                   />
                 </div>
               </div>
@@ -332,30 +244,23 @@ export function SyncSettings() {
                 <label className="block text-xs font-medium mb-1.5" style={{ color: "var(--text-secondary)" }}>
                   远程路径
                 </label>
-                <input
+                <Input
                   type="text"
-                  style={inputStyle}
                   value={config.remote_path}
                   onChange={(e) => setConfig({ ...config, remote_path: e.target.value })}
-                  onFocus={(e) => {
-                    e.currentTarget.style.borderColor = "var(--accent)";
-                  }}
-                  onBlur={(e) => {
-                    e.currentTarget.style.borderColor = "var(--border)";
-                  }}
                 />
               </div>
 
               <div className="flex items-center gap-4">
-                <label className="flex items-center gap-2 text-sm cursor-pointer">
-                  <input
-                    type="checkbox"
+                <div className="flex items-center gap-2">
+                  <Switch
+                    size="sm"
                     checked={config.auto_sync}
-                    onChange={(e) => setConfig({ ...config, auto_sync: e.target.checked })}
-                    style={{ accentColor: "var(--accent)" }}
+                    onChange={(v) => setConfig({ ...config, auto_sync: v })}
+                    title="自动同步"
                   />
-                  自动同步
-                </label>
+                  <span className="text-sm">自动同步</span>
+                </div>
                 {config.auto_sync && (
                   <div className="flex items-center gap-2">
                     <span className="text-xs" style={{ color: "var(--text-tertiary)" }}>
@@ -386,36 +291,21 @@ export function SyncSettings() {
               </div>
 
               <div className="flex items-center gap-2 pt-1">
-                <button
-                  className="px-4 py-2 rounded-lg text-sm font-medium text-white"
-                  style={{
-                    background: "linear-gradient(135deg, var(--accent), var(--accent-hover))",
-                  }}
-                  onClick={handleSave}
-                >
+                <Button onClick={handleSave}>
                   保存配置
-                </button>
-                <button
-                  className="px-4 py-2 rounded-lg text-sm flex items-center gap-1.5"
-                  style={{
-                    color: "var(--text-secondary)",
-                    border: "1px solid var(--border)",
-                    background: "var(--bg-secondary)",
-                  }}
-                  onClick={handleTest}
-                  disabled={testing}
-                >
+                </Button>
+                <Button variant="secondary" onClick={handleTest} disabled={testing}>
                   {testing ? (
                     <>
-                      <div className="w-3 h-3 rounded-full border-2 border-current border-t-transparent animate-spin" />
+                      <span className="inline-block w-3 h-3 rounded-full border-2 border-current border-t-transparent animate-spin" />
                       测试中...
                     </>
                   ) : (
                     "测试连接"
                   )}
-                </button>
+                </Button>
                 {testResult === "success" && (
-                  <span className="text-sm flex items-center gap-1" style={{ color: "#22c55e" }}>
+                  <span className="text-sm flex items-center gap-1" style={{ color: "var(--success)" }}>
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                       <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
                       <polyline points="22 4 12 14.01 9 11.01" />
@@ -424,7 +314,7 @@ export function SyncSettings() {
                   </span>
                 )}
                 {testResult === "error" && (
-                  <span className="text-sm flex items-center gap-1" style={{ color: "#ef4444" }}>
+                  <span className="text-sm flex items-center gap-1" style={{ color: "var(--error)" }}>
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                       <circle cx="12" cy="12" r="10" />
                       <line x1="15" y1="9" x2="9" y2="15" />

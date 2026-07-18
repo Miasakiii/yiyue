@@ -1,4 +1,4 @@
-﻿import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useAppStore } from "../stores/app";
 import type { BookListItem, Tag, Group } from "../types";
 
@@ -24,6 +24,15 @@ const FORMAT_LABELS: Record<string, string> = {
   markdown: "MD",
   cbz: "CBZ",
 };
+
+/** Uniform linear icon for groups (replaces per-group emoji). */
+function GroupIcon({ size = 13 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+      <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
+    </svg>
+  );
+}
 
 export function BookCard({ book, viewMode }: BookCardProps) {
   const {
@@ -54,8 +63,10 @@ export function BookCard({ book, viewMode }: BookCardProps) {
     e.preventDefault();
     e.stopPropagation();
     loadBookAssociations();
-    loadTags();
-    loadGroups();
+    // Only fetch tags/groups when the store doesn't have them yet
+    const state = useAppStore.getState();
+    if (state.tags.length === 0) loadTags();
+    if (state.groups.length === 0) loadGroups();
     setCtxMenu({ x: e.clientX, y: e.clientY });
     setCtxTab("tags");
   }, [loadBookAssociations, loadTags, loadGroups]);
@@ -118,9 +129,9 @@ export function BookCard({ book, viewMode }: BookCardProps) {
     }
   };
 
-  // Tag dots rendered inline
-  const tagDots = bookTags.length > 0 && (
-    <div className="flex gap-0.5 flex-wrap" style={{ minHeight: 6 }}>
+  // Tag dots rendered inline — always occupies its row so cards stay equal height
+  const tagDots = (
+    <div className="flex gap-0.5 flex-wrap items-center" style={{ minHeight: 6 }}>
       {bookTags.slice(0, 5).map((t) => (
         <div
           key={t.id}
@@ -139,11 +150,10 @@ export function BookCard({ book, viewMode }: BookCardProps) {
     return (
       <>
         <div
-          className="flex items-center gap-4 px-4 py-3 rounded-xl cursor-pointer group hover-bg"
+          className="flex items-center gap-4 px-4 py-3 rounded-xl cursor-pointer group card-hover"
           style={{
             background: "var(--bg-secondary)",
             border: "1px solid var(--border-light)",
-            transition: "all var(--transition-normal)",
           }}
           onClick={() => openBook(book.id)}
           onContextMenu={handleContextMenu}
@@ -171,7 +181,7 @@ export function BookCard({ book, viewMode }: BookCardProps) {
           <div className="flex items-center gap-3">
             <div className="flex items-center gap-2">
               <div className="w-16 progress-bar">
-                <div className="progress-bar-fill" style={{ width: `${progress}%`, background: progress >= 100 ? "#22c55e" : formatColor }} />
+                <div className="progress-bar-fill" style={{ width: `${progress}%`, background: progress >= 100 ? "var(--success)" : formatColor }} />
               </div>
               <span className="text-xs w-10 text-right" style={{ color: "var(--text-tertiary)" }}>
                 {formatProgress(progress)}
@@ -179,7 +189,7 @@ export function BookCard({ book, viewMode }: BookCardProps) {
             </div>
             <button
               className="p-1.5 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity"
-              style={{ color: book.starred ? "#f59e0b" : "var(--text-tertiary)" }}
+              style={{ color: book.starred ? "var(--warning)" : "var(--text-tertiary)" }}
               onClick={(e) => { e.stopPropagation(); toggleFavorite(book.id); }}
             >
               <svg width="14" height="14" viewBox="0 0 24 24" fill={book.starred ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2">
@@ -189,8 +199,8 @@ export function BookCard({ book, viewMode }: BookCardProps) {
             <button
               className="p-1.5 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity"
               style={{
-                color: showDeleteConfirm ? "#ef4444" : "var(--text-tertiary)",
-                background: showDeleteConfirm ? "rgba(239, 68, 68, 0.1)" : "transparent",
+                color: showDeleteConfirm ? "var(--error)" : "var(--text-tertiary)",
+                background: showDeleteConfirm ? "var(--error-soft)" : "transparent",
               }}
               onClick={handleDelete}
               title={showDeleteConfirm ? "确认删除" : "删除"}
@@ -210,25 +220,14 @@ export function BookCard({ book, viewMode }: BookCardProps) {
   return (
     <>
       <div
-        className="flex flex-col rounded-xl overflow-hidden cursor-pointer group"
+        className="flex flex-col rounded-xl overflow-hidden cursor-pointer group card-hover"
         style={{
           background: "var(--bg-elevated)",
           border: "1px solid var(--border-light)",
-          transition: "all var(--transition-normal)",
         }}
         onClick={() => openBook(book.id)}
         onContextMenu={handleContextMenu}
-        onMouseEnter={(e) => {
-          e.currentTarget.style.transform = "translateY(-3px)";
-          e.currentTarget.style.boxShadow = "var(--shadow-lg)";
-          e.currentTarget.style.borderColor = "var(--border)";
-        }}
-        onMouseLeave={(e) => {
-          e.currentTarget.style.transform = "translateY(0)";
-          e.currentTarget.style.boxShadow = "none";
-          e.currentTarget.style.borderColor = "var(--border-light)";
-          setShowDeleteConfirm(false);
-        }}
+        onMouseLeave={() => setShowDeleteConfirm(false)}
       >
         {/* Cover */}
         <div
@@ -236,7 +235,13 @@ export function BookCard({ book, viewMode }: BookCardProps) {
           style={{ background: `linear-gradient(145deg, ${formatColor}15, ${formatColor}08)` }}
         >
           {book.cover_path ? (
-            <img src={book.cover_path} alt={book.title} className="w-full h-full object-cover" />
+            <img
+              src={book.cover_path}
+              alt={book.title}
+              loading="lazy"
+              className="w-full h-full object-cover"
+              style={{ background: "var(--bg-tertiary)" }}
+            />
           ) : (
             <div className="flex flex-col items-center gap-3">
               <div
@@ -267,14 +272,14 @@ export function BookCard({ book, viewMode }: BookCardProps) {
           {progress >= 100 && (
             <div
               className="absolute top-2 right-2 px-1.5 py-0.5 rounded-md text-xs font-medium"
-              style={{ background: "rgba(34, 197, 94, 0.9)", color: "white", backdropFilter: "blur(4px)" }}
+              style={{ background: "var(--success)", color: "white" }}
             >
               已读完
             </div>
           )}
           {book.starred && (
             <div className="absolute top-2 left-2">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="#f59e0b" stroke="none">
+              <svg width="16" height="16" viewBox="0 0 24 24" stroke="none" style={{ fill: "var(--warning)" }}>
                 <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
               </svg>
             </div>
@@ -282,7 +287,7 @@ export function BookCard({ book, viewMode }: BookCardProps) {
           <button
             className="absolute bottom-2 right-2 p-1.5 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity"
             style={{
-              background: showDeleteConfirm ? "rgba(239, 68, 68, 0.9)" : "rgba(0,0,0,0.5)",
+              background: showDeleteConfirm ? "var(--error)" : "var(--overlay-bg)",
               color: "white",
               backdropFilter: "blur(4px)",
             }}
@@ -305,7 +310,7 @@ export function BookCard({ book, viewMode }: BookCardProps) {
           {tagDots}
           <div className="flex items-center gap-2 mt-2">
             <div className="flex-1 progress-bar">
-              <div className="progress-bar-fill" style={{ width: `${progress}%`, background: progress >= 100 ? "#22c55e" : formatColor }} />
+              <div className="progress-bar-fill" style={{ width: `${progress}%`, background: progress >= 100 ? "var(--success)" : formatColor }} />
             </div>
             <span className="text-xs flex-shrink-0" style={{ color: "var(--text-tertiary)" }}>
               {formatProgress(progress)}
@@ -351,7 +356,7 @@ function ContextMenu({
   return (
     <div
       ref={ctxRef}
-      className="fixed z-[250] animate-scale-in"
+      className="fixed animate-scale-in"
       style={{
         left: clampedX,
         top: clampedY,
@@ -361,6 +366,7 @@ function ContextMenu({
         borderRadius: "var(--radius-md)",
         boxShadow: "var(--shadow-xl)",
         overflow: "hidden",
+        zIndex: "var(--z-popover)",
       }}
     >
       {/* Tabs */}
@@ -397,19 +403,14 @@ function ContextMenu({
           items.map((item) => {
             const selected = selectedIds.includes(item.id);
             const isTag = ctxTab === "tags";
+            // Note: selected background is inline so it wins over .hover-bg on hover
             return (
               <button
                 key={item.id}
-                className="w-full flex items-center gap-2.5 px-3 py-2 text-xs transition-colors text-left"
+                className="w-full flex items-center gap-2.5 px-3 py-2 text-xs transition-colors text-left hover-bg"
                 style={{
                   color: "var(--text-primary)",
-                  background: selected ? "var(--accent-soft)" : "transparent",
-                }}
-                onMouseEnter={(e) => {
-                  if (!selected) e.currentTarget.style.background = "var(--bg-tertiary)";
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.background = selected ? "var(--accent-soft)" : "transparent";
+                  background: selected ? "var(--accent-soft)" : undefined,
                 }}
                 onClick={() => {
                   if (isTag) toggleBookTag(item.id);
@@ -419,7 +420,9 @@ function ContextMenu({
                 {isTag ? (
                   <div className="w-3 h-3 rounded-full flex-shrink-0" style={{ background: (item as Tag).color }} />
                 ) : (
-                  <span className="text-sm flex-shrink-0 w-4 text-center">{(item as Group).icon || "📁"}</span>
+                  <span className="flex-shrink-0 w-4 flex justify-center" style={{ color: "var(--text-tertiary)" }}>
+                    <GroupIcon />
+                  </span>
                 )}
                 <span className="flex-1 truncate">{item.name}</span>
                 {selected && (

@@ -1,41 +1,57 @@
-import { useEffect, useState, useRef, useCallback } from "react";
+import { useEffect, useState, useRef, useCallback, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { invoke } from "@tauri-apps/api/core";
+import DOMPurify from "dompurify";
 import { useAppStore } from "../stores/app";
-import { HighlightPopover } from "../components/HighlightPopover";
 import { NotePanel } from "../components/NotePanel";
-import { THEMES } from "../constants";
 import { useFullscreen } from "../hooks/useFullscreen";
+import { useReaderKeyboard } from "../hooks/useReaderKeyboard";
 import { showToast } from "../components/Toast";
-import type { SaveReadingProfile } from "../types";
+import { ToolbarBtn, Divider } from "./reader/helpers";
+import { ReaderSettings } from "./reader/ReaderSettings";
+import { ReaderSidebar } from "./reader/ReaderSidebar";
+import { ReaderStatusBar } from "./reader/ReaderStatusBar";
+import { ReaderContent } from "./reader/ReaderContent";
+import type { SaveReadingProfile, Bookmark } from "../types";
 
-/* ---------- Reading settings helpers ---------- */
-const FONT_FAMILIES = [
-  { key: "default", label: "Sans", value: "system-ui, -apple-system, 'Segoe UI', sans-serif" },
-  { key: "serif", label: "Serif", value: "Georgia, 'Noto Serif SC', 'Source Han Serif SC', serif" },
-  { key: "mono", label: "Mono", value: "'JetBrains Mono', 'Fira Code', 'Cascadia Code', monospace" },
-] as const;
-
-const LINE_HEIGHT_PRESETS = [1.4, 1.6, 1.8, 2.0, 2.4] as const;
-
-const CONTENT_WIDTH_PRESETS = [
-  { key: "narrow", label: "窄", value: 480 },
-  { key: "medium", label: "中", value: 640 },
-  { key: "wide", label: "宽", value: 768 },
-  { key: "full", label: "全", value: 960 },
-] as const;
+import { FONT_FAMILIES, CONTENT_WIDTH_PRESETS, type Preset } from "./reader/constants";
 
 /* ---------- Component ---------- */
 export function Reader() {
   const navigate = useNavigate();
   const {
     currentBook, chapters, currentChapter, progress, readingProfile,
+    bookmarks, createBookmark, deleteBookmark, closeBook, contentVersion,
     updateProgress, loadChapter, theme, setTheme, saveReadingProfile,
   } = useAppStore();
 
   const [content, setContent] = useState("");
   const [loading, setLoading] = useState(false);
   const [charsPerMinute, setCharsPerMinute] = useState(300);
+  const [dailyGoal, setDailyGoal] = useState(() => Number(localStorage.getItem("reader-daily-goal")) || 0);
+  const [todayStats, setTodayStats] = useState<{ date: string; chars_read: number; duration_ms: number; sessions: number } | null>(null);
+  const [editingGoal, setEditingGoal] = useState(false);
+  const [goalInput, setGoalInput] = useState("");
+  const [activePreset, setActivePreset] = useState(() => localStorage.getItem("reader-preset") || null);
+
+  const applyPreset = (preset: Preset) => {
+    setFontSize(preset.font_size);
+    setLineHeight(preset.line_height);
+    setFontFamilyKey(preset.font_family as "default" | "serif" | "mono");
+    setContentWidthKey(preset.content_width as "narrow" | "medium" | "wide" | "full");
+    setParagraphSpacing(preset.paragraph_spacing);
+    setTextAlign(preset.text_align);
+    setPageAnimation(preset.page_animation);
+  };
+
+  // Markdown content is rendered as HTML — sanitize it to prevent XSS from
+  // untrusted local files. Pure-text formats bypass this path entirely.
+  const isMarkdown =
+    currentBook?.format === "md" || currentBook?.format === "markdown";
+  const sanitizedHtml = useMemo(() => {
+    if (!isMarkdown || !content) return "";
+    return DOMPurify.sanitize(content, { USE_PROFILES: { html: true } });
+  }, [content, isMarkdown]);
 
   // Reading settings — initialized from localStorage (global defaults)
   const [fontSize, setFontSize] = useState(
@@ -85,6 +101,93 @@ export function Reader() {
   const settingsRef = useRef<HTMLDivElement>(null);
   const sessionStartRef = useRef<Date>(new Date());
   const charsReadRef = useRef(0);
+
+  /* ---- TTS (Text-to-Speech) ---- */
+  const [isSpeaking, setIsSpeaking] = useState(false);
+  const [isPaused, setIsPaused] = useState(false);
+  const [ttsRate, setTtsRate] = useState(() => Number(localStorage.getItem("reader-tts-rate")) || 1.0);
+  const [ttsVoice, setTtsVoice] = useState<string | null>(null);
+
+  const getPlainText = useCallback(() => {
+    if (!content) return "";
+    if (isMarkdown) {
+      return content.replace(/<[^>]*>/g, "").replace(/&nbsp;/g, " ").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&amp;/g, "&");
+    }
+    return content;
+  }, [content, isMarkdown]);
+
+  const startTts = useCallback(() => {
+    if (typeof window === "undefined" || !window.speechSynthesis) {
+      showToast("当前环境不支持语音朗读", "error");
+      return;
+    }
+    const text = getPlainText();
+    if (!text) return;
+    window.speechSynthesis.cancel();
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.lang = "zh-CN";
+    utterance.rate = ttsRate;
+    if (ttsVoice) {
+      const voices = window.speechSynthesis.getVoices();
+      const voice = voices.find(v => v.name === ttsVoice);
+      if (voice) utterance.voice = voice;
+    }
+    utterance.onend = () => {
+      window.speechSynthesis.cancel();
+      setIsSpeaking(false);
+      setIsPaused(false);
+    };
+    utterance.onerror = () => {
+      setIsSpeaking(false);
+      setIsPaused(false);
+    };
+    window.speechSynthesis.speak(utterance);
+    setIsSpeaking(true);
+    setIsPaused(false);
+  }, [getPlainText, ttsRate, ttsVoice, showToast]);
+
+  const pauseTts = useCallback(() => {
+    if (window.speechSynthesis) {
+      window.speechSynthesis.pause();
+      setIsPaused(true);
+    }
+  }, []);
+
+  const resumeTts = useCallback(() => {
+    if (window.speechSynthesis) {
+      window.speechSynthesis.resume();
+      setIsPaused(false);
+    }
+  }, []);
+
+  const stopTts = useCallback(() => {
+    if (window.speechSynthesis) {
+      window.speechSynthesis.cancel();
+      setIsSpeaking(false);
+      setIsPaused(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    localStorage.setItem("reader-tts-rate", String(ttsRate));
+  }, [ttsRate]);
+
+  // Stop TTS when chapter changes
+  useEffect(() => {
+    stopTts();
+  }, [currentChapter?.id, stopTts]);
+
+  // Load available voices
+  useEffect(() => {
+    if (typeof window === "undefined" || !window.speechSynthesis) return;
+    const loadVoices = () => {
+      const voices = window.speechSynthesis.getVoices();
+      const zhVoice = voices.find(v => v.lang.startsWith("zh"));
+      if (zhVoice) setTtsVoice(zhVoice.name);
+    };
+    loadVoices();
+    window.speechSynthesis.onvoiceschanged = loadVoices;
+  }, []);
 
   const fontFamily =
     FONT_FAMILIES.find((f) => f.key === fontFamilyKey)?.value ??
@@ -166,6 +269,25 @@ export function Reader() {
       .catch(() => setCharsPerMinute(300));
   }, [currentBook]);
 
+  /* ---- Load today's reading stats for goal progress ---- */
+  useEffect(() => {
+    if (!currentBook) return;
+    invoke<{ date: string; chars_read: number; duration_ms: number; sessions: number }[]>("get_daily_stats", { days: 1 })
+      .then((stats) => {
+        if (stats && stats.length > 0) {
+          setTodayStats(stats[0]);
+        } else {
+          setTodayStats({ date: "", chars_read: 0, duration_ms: 0, sessions: 0 });
+        }
+      })
+      .catch(() => setTodayStats({ date: "", chars_read: 0, duration_ms: 0, sessions: 0 }));
+  }, [currentBook]);
+
+  // Persist daily goal
+  useEffect(() => {
+    localStorage.setItem("reader-daily-goal", String(dailyGoal));
+  }, [dailyGoal]);
+
   /* ---- Trigger page animation on chapter change ---- */
   useEffect(() => {
     if (!currentChapter || !prevChapterRef.current || pageAnimation === "none") {
@@ -203,7 +325,7 @@ export function Reader() {
         console.error("Failed to load chapter:", e);
         setLoading(false);
       });
-  }, [currentChapter]);
+  }, [currentChapter, contentVersion]);
 
   /* ---- Save progress on scroll ---- */
   const handleScroll = useCallback(() => {
@@ -226,58 +348,46 @@ export function Reader() {
     scrollTimeoutRef.current = setTimeout(handleScroll, 1000);
   }, [handleScroll]);
 
-  /* ---- Keyboard navigation ---- */
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (!currentChapter) return;
-      const chapterIndex = chapters.findIndex((c) => c.id === currentChapter.id);
-      if (e.key === "ArrowRight" || e.key === "PageDown") {
-        e.preventDefault();
-        if (chapterIndex < chapters.length - 1) loadChapter(chapters[chapterIndex + 1].id);
-      } else if (e.key === "ArrowLeft" || e.key === "PageUp") {
-        e.preventDefault();
-        if (chapterIndex > 0) loadChapter(chapters[chapterIndex - 1].id);
-      } else if (e.key === "=" && (e.ctrlKey || e.metaKey)) {
-        e.preventDefault();
-        setFontSize((s) => Math.min(s + 2, 36));
-      } else if (e.key === "-" && (e.ctrlKey || e.metaKey)) {
-        e.preventDefault();
-        setFontSize((s) => Math.max(s - 2, 12));
-      } else if (e.key === "b" && (e.ctrlKey || e.metaKey)) {
-        e.preventDefault();
-        setShowSidebar((s) => !s);
-      } else if (e.key === "n" && (e.ctrlKey || e.metaKey)) {
-        e.preventDefault();
-        setShowNotes((s) => !s);
-      } else if (e.key === "d" && (e.ctrlKey || e.metaKey)) {
-        // Ctrl+D: toggle favorite / bookmark
-        e.preventDefault();
-        if (currentBook) {
-          useAppStore.getState().toggleFavorite(currentBook.id);
-          showToast("已切换收藏状态", "success");
-        }
-      } else if (e.key === "g" && (e.ctrlKey || e.metaKey)) {
-        // Ctrl+G: open sidebar for chapter jump
-        e.preventDefault();
+  /* ---- Bookmarks ---- */
+  const handleAddBookmark = useCallback(() => {
+    if (!currentBook || !currentChapter) return;
+    const chapterIdx = chapters.findIndex((c) => c.id === currentChapter.id);
+    const scrollOffset = progress?.scroll_offset ?? 0;
+    const chapterTitle = currentChapter.title || `第 ${chapterIdx + 1} 章`;
+    const title = `${chapterIdx + 1}. ${chapterTitle} · ${Math.round(scrollOffset * 100)}%`;
+    createBookmark({
+      book_id: currentBook.id,
+      chapter_id: currentChapter.id,
+      scroll_offset: scrollOffset,
+      title,
+    })
+      .then(() => {
+        showToast("已添加书签", "success");
         setShowSidebar(true);
-      } else if (e.key === "f" && (e.ctrlKey || e.metaKey) && !e.shiftKey) {
-        // Ctrl+F: search current book (dispatch global search event)
-        e.preventDefault();
-        window.dispatchEvent(new CustomEvent("open-search"));
-      } else if (e.key === "Escape") {
-        // Escape: close open panels
-        e.preventDefault();
-        if (settingsOpen) setSettingsOpen(false);
-        else if (showNotes) setShowNotes(false);
-        else if (showSidebar) setShowSidebar(false);
-      } else if (e.key === "F11") {
-        e.preventDefault();
-        toggleFullscreen();
-      }
-    };
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [currentChapter, chapters, toggleFullscreen, settingsOpen, showNotes, showSidebar, currentBook]);
+      })
+      .catch(() => {});
+  }, [currentBook, currentChapter, chapters, progress, createBookmark]);
+
+  const handleJumpToBookmark = (bookmark: Bookmark) => {
+    if (!bookmark.chapter_id) return;
+    loadChapter(bookmark.chapter_id).then(() => {
+      setTimeout(() => {
+        if (!contentRef.current) return;
+        const el = contentRef.current;
+        const scrollHeight = el.scrollHeight - el.clientHeight;
+        el.scrollTop = bookmark.scroll_offset * scrollHeight;
+        setShowSidebar(false);
+      }, 150);
+    });
+  };
+
+  /* ---- Keyboard navigation ---- */
+  useReaderKeyboard({
+    currentChapter, chapters, loadChapter, setFontSize,
+    setShowSidebar, setShowNotes, setSettingsOpen,
+    settingsOpen, showNotes, showSidebar,
+    toggleFullscreen, handleAddBookmark, currentBook,
+  });
 
   /* ---- Restore scroll position ---- */
   useEffect(() => {
@@ -294,7 +404,6 @@ export function Reader() {
     setShowSidebar(false);
   };
 
-  const { closeBook } = useAppStore.getState();
   const goBack = () => {
     if (currentBook) handleScroll();
     useAppStore.getState().closeBook();
@@ -324,7 +433,7 @@ export function Reader() {
       <div className="flex items-center justify-center h-screen" style={{ background: "var(--bg-primary)" }}>
         <div className="flex flex-col items-center gap-3">
           <div className="w-8 h-8 rounded-full border-2 border-t-transparent animate-spin" style={{ borderColor: "var(--accent)", borderTopColor: "transparent" }} />
-          <div className="text-sm" style={{ color: "var(--text-tertiary)" }}>加载中...</div>
+          <div className="text-sm" style={{ color: "var(--text-tertiary)" }}>加载中…</div>
         </div>
       </div>
     );
@@ -354,32 +463,15 @@ export function Reader() {
     <div className="flex h-screen overflow-hidden" style={{ background: "var(--bg-primary)", color: "var(--text-primary)" }}>
       {/* Sidebar - Chapter list */}
       {showSidebar && (
-        <aside className="w-72 flex-shrink-0 flex flex-col overflow-hidden animate-slide-right"
-          style={{ background: "var(--bg-secondary)", borderRight: "1px solid var(--border)" }}>
-          <div className="flex items-center justify-between px-5 py-4 flex-shrink-0" style={{ borderBottom: "1px solid var(--border)" }}>
-            <span className="text-sm font-semibold">目录</span>
-            <span className="text-xs px-2 py-0.5 rounded-full" style={{ background: "var(--accent-soft)", color: "var(--accent)" }}>
-              {chapterIndex + 1} / {chapters.length}
-            </span>
-          </div>
-          <div className="flex-1 overflow-y-auto py-2" ref={(el) => {
-            // Auto-scroll to current chapter
-            if (el && currentChapter) {
-              const current = el.querySelector(`[data-chapter-id="${currentChapter.id}"]`);
-              if (current) current.scrollIntoView({ block: "center", behavior: "smooth" });
-            }
-          }}>
-            {chapters.map((ch, i) => (
-              <button key={ch.id} data-chapter-id={ch.id}
-                className={`w-full text-left px-5 py-2.5 text-sm sidebar-item ${ch.id === currentChapter.id ? 'active' : ''}`}
-                onClick={() => goToChapter(ch.id)}
-              >
-                <span className="mr-2 text-xs tabular-nums" style={{ color: "var(--text-tertiary)", minWidth: 24, display: "inline-block" }}>{i + 1}</span>
-                {ch.title || `第 ${i + 1} 章`}
-              </button>
-            ))}
-          </div>
-        </aside>
+        <ReaderSidebar
+          chapters={chapters}
+          currentChapter={currentChapter}
+          goToChapter={goToChapter}
+          bookmarks={bookmarks}
+          addBookmark={handleAddBookmark}
+          deleteBookmark={deleteBookmark}
+          jumpToBookmark={handleJumpToBookmark}
+        />
       )}
 
       {/* Main content */}
@@ -404,149 +496,42 @@ export function Reader() {
           </div>
 
           <div className="flex items-center gap-1">
+            {/* TTS button — directly toggles speak/pause/resume */}
+            <ToolbarBtn
+              active={isSpeaking}
+              onClick={() => (isSpeaking ? (isPaused ? resumeTts() : pauseTts()) : startTts())}
+              title={isSpeaking ? (isPaused ? "继续" : "暂停") : "朗读"}>
+              {isSpeaking && !isPaused ? (
+                <><rect x="6" y="4" width="4" height="16" /><rect x="14" y="4" width="4" height="16" /></>
+              ) : (
+                <polygon points="5 3 19 12 5 21 5 3" />
+              )}
+            </ToolbarBtn>
+
             {/* Settings button */}
             <div className="relative" ref={settingsRef}>
-              <button className="px-2 py-1.5 rounded-lg text-xs flex items-center gap-1"
-                style={{
-                  color: settingsOpen ? "var(--accent)" : "var(--text-tertiary)",
-                  background: settingsOpen ? "var(--accent-soft)" : "transparent",
-                }}
-                onClick={() => setSettingsOpen(!settingsOpen)}
-                title="Settings">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" />
-                </svg>
-              </button>
+              <ToolbarBtn active={settingsOpen} onClick={() => setSettingsOpen(!settingsOpen)} title="设置">
+                <><circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2 2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-.33-1.82l-.06.06a2 2 0 0 1 0-2.83 2 2 0 0 1-2.83 0l-.06.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2 2 2 2 0 0 1 2 2h.09a1.65 1.65 0 0 0-1.51 1z" /></>
+              </ToolbarBtn>
 
               {/* Settings Popover */}
               {settingsOpen && (
-                <div className="absolute right-0 top-full mt-2 z-50 animate-scale-in"
-                  style={{
-                    width: 260, background: "var(--bg-elevated)", border: "1px solid var(--border)",
-                    borderRadius: 10, boxShadow: "var(--shadow-xl)", padding: "8px 0",
-                  }}>
-                  {/* Font size slider */}
-                  <SettingRow label="字号">
-                    <div className="flex items-center gap-2 flex-1">
-                      <span className="text-xs tabular-nums w-6 text-right" style={{ color: "var(--text-tertiary)" }}>{fontSize}</span>
-                      <input type="range" min={12} max={36} step={1} value={fontSize}
-                        className="flex-1 h-1 rounded-full appearance-none cursor-pointer"
-                        style={{ accentColor: "var(--accent)" }}
-                        onChange={(e) => setFontSize(Number(e.target.value))} />
-                    </div>
-                  </SettingRow>
-
-                  {/* Line height */}
-                  <SettingRow label="行高">
-                    <div className="flex gap-1">
-                      {LINE_HEIGHT_PRESETS.map((lh) => (
-                        <button key={lh} className="px-1.5 py-1 rounded-md text-xs tabular-nums"
-                          style={{
-                            background: lineHeight === lh ? "var(--accent-soft)" : "var(--bg-tertiary)",
-                            color: lineHeight === lh ? "var(--accent)" : "var(--text-tertiary)",
-                            fontWeight: lineHeight === lh ? 600 : 400,
-                          }}
-                          onClick={() => setLineHeight(lh)}>{lh}</button>
-                      ))}
-                    </div>
-                  </SettingRow>
-
-                  {/* Content width */}
-                  <SettingRow label="宽度">
-                    <div className="flex gap-1">
-                      {CONTENT_WIDTH_PRESETS.map((w) => (
-                        <button key={w.key} className="px-1.5 py-1 rounded-md text-xs"
-                          style={{
-                            background: contentWidthKey === w.key ? "var(--accent-soft)" : "var(--bg-tertiary)",
-                            color: contentWidthKey === w.key ? "var(--accent)" : "var(--text-tertiary)",
-                            fontWeight: contentWidthKey === w.key ? 600 : 400,
-                          }}
-                          onClick={() => setContentWidthKey(w.key)}>{w.label}</button>
-                      ))}
-                    </div>
-                  </SettingRow>
-
-                  {/* Paragraph spacing */}
-                  <SettingRow label="段距">
-                    <div className="flex items-center gap-2 flex-1">
-                      <span className="text-xs tabular-nums w-6 text-right" style={{ color: "var(--text-tertiary)" }}>{paragraphSpacing.toFixed(1)}</span>
-                      <input type="range" min={0} max={2} step={0.1} value={paragraphSpacing}
-                        className="flex-1 h-1 rounded-full appearance-none cursor-pointer"
-                        style={{ accentColor: "var(--accent)" }}
-                        onChange={(e) => setParagraphSpacing(Number(e.target.value))} />
-                    </div>
-                  </SettingRow>
-
-                  {/* Text align */}
-                  <SettingRow label="对齐">
-                    <div className="flex gap-1">
-                      <button className="px-2 py-1 rounded-md text-xs"
-                        style={{
-                          background: textAlign === "left" ? "var(--accent-soft)" : "var(--bg-tertiary)",
-                          color: textAlign === "left" ? "var(--accent)" : "var(--text-tertiary)",
-                          fontWeight: textAlign === "left" ? 600 : 400,
-                        }}
-                        onClick={() => setTextAlign("left")}>左</button>
-                      <button className="px-2 py-1 rounded-md text-xs"
-                        style={{
-                          background: textAlign === "justify" ? "var(--accent-soft)" : "var(--bg-tertiary)",
-                          color: textAlign === "justify" ? "var(--accent)" : "var(--text-tertiary)",
-                          fontWeight: textAlign === "justify" ? 600 : 400,
-                        }}
-                        onClick={() => setTextAlign("justify")}>两端</button>
-                    </div>
-                  </SettingRow>
-
-                  {/* Font family */}
-                  <SettingRow label="字体">
-                    <div className="flex gap-1">
-                      {FONT_FAMILIES.map((f) => (
-                        <button key={f.key} className="px-1.5 py-1 rounded-md text-xs"
-                          style={{
-                            background: fontFamilyKey === f.key ? "var(--accent-soft)" : "var(--bg-tertiary)",
-                            color: fontFamilyKey === f.key ? "var(--accent)" : "var(--text-tertiary)",
-                            fontWeight: fontFamilyKey === f.key ? 600 : 400,
-                            fontFamily: f.value,
-                          }}
-                          onClick={() => setFontFamilyKey(f.key)}>{f.label}</button>
-                      ))}
-                    </div>
-                  </SettingRow>
-
-                  {/* Theme */}
-                  <SettingRow label="主题">
-                    <div className="flex gap-1">
-                      {THEMES.map((t) => (
-                        <button key={t.key} className="px-2 py-1 rounded-md text-xs"
-                          style={{
-                            background: theme === t.key ? "var(--accent-soft)" : "var(--bg-tertiary)",
-                            color: theme === t.key ? "var(--accent)" : "var(--text-tertiary)",
-                            fontWeight: theme === t.key ? 600 : 400,
-                          }}
-                          onClick={() => setTheme(t.key)}>{t.label}</button>
-                      ))}
-                    </div>
-                  </SettingRow>
-
-                  {/* Page animation */}
-                  <SettingRow label="翻页">
-                    <div className="flex gap-1">
-                      {[
-                        { key: "none", label: "无" },
-                        { key: "fade", label: "淡入" },
-                        { key: "slide", label: "滑动" },
-                      ].map((a) => (
-                        <button key={a.key} className="px-1.5 py-1 rounded-md text-xs"
-                          style={{
-                            background: pageAnimation === a.key ? "var(--accent-soft)" : "var(--bg-tertiary)",
-                            color: pageAnimation === a.key ? "var(--accent)" : "var(--text-tertiary)",
-                            fontWeight: pageAnimation === a.key ? 600 : 400,
-                          }}
-                          onClick={() => setPageAnimation(a.key)}>{a.label}</button>
-                      ))}
-                    </div>
-                  </SettingRow>
-                </div>
+                <ReaderSettings
+                  fontSize={fontSize} setFontSize={setFontSize}
+                  lineHeight={lineHeight} setLineHeight={setLineHeight}
+                  fontFamilyKey={fontFamilyKey} setFontFamilyKey={setFontFamilyKey}
+                  contentWidthKey={contentWidthKey} setContentWidthKey={setContentWidthKey}
+                  paragraphSpacing={paragraphSpacing} setParagraphSpacing={setParagraphSpacing}
+                  textAlign={textAlign} setTextAlign={setTextAlign}
+                  pageAnimation={pageAnimation} setPageAnimation={setPageAnimation}
+                  theme={theme} setTheme={setTheme}
+                  activePreset={activePreset} applyPreset={applyPreset}
+                  setActivePreset={setActivePreset}
+                  isSpeaking={isSpeaking} isPaused={isPaused}
+                  startTts={startTts} pauseTts={pauseTts} resumeTts={resumeTts} stopTts={stopTts}
+                  ttsRate={ttsRate} setTtsRate={setTtsRate}
+                  onClose={() => setSettingsOpen(false)}
+                />
               )}
             </div>
 
@@ -579,54 +564,37 @@ export function Reader() {
         </header>
 
         {/* Chapter content */}
-        <div ref={contentRef} className="flex-1 overflow-y-auto relative" onScroll={onScroll}>
-          {loading ? (
-            <div className="flex items-center justify-center h-full">
-              <div className="flex flex-col items-center gap-3">
-                <div className="w-6 h-6 rounded-full border-2 border-t-transparent animate-spin" style={{ borderColor: "var(--accent)", borderTopColor: "transparent" }} />
-                <div className="text-sm" style={{ color: "var(--text-tertiary)" }}>Loading...</div>
-              </div>
-            </div>
-          ) : (
-            <article className={`mx-auto px-8 py-12 ${animClass}`}
-              style={{
-                fontSize: `${fontSize}px`, lineHeight, fontFamily,
-                maxWidth: `${contentWidth}px`, textAlign,
-                '--reader-paragraph-spacing': `${paragraphSpacing}em`,
-              } as React.CSSProperties}>
-              <h2 className="text-2xl font-semibold mb-8 pb-4"
-                style={{ borderBottom: "1px solid var(--border-light)", color: "var(--text-primary)" }}>
-                {currentChapter.title}
-              </h2>
-              <div className={
-                  currentBook.format === "md" || currentBook.format === "markdown"
-                    ? "markdown-body select-text" : "whitespace-pre-wrap select-text"
-                }
-                style={{ color: "var(--text-primary)", letterSpacing: "0.02em" }}
-                {...(currentBook.format === "md" || currentBook.format === "markdown"
-                  ? { dangerouslySetInnerHTML: { __html: content } } : {}
-                )}>
-                {currentBook.format === "md" || currentBook.format === "markdown" ? null : content}
-              </div>
-            </article>
-          )}
-          <HighlightPopover bookId={currentBook.id} chapterId={currentChapter.id} />
-        </div>
+        <ReaderContent
+          content={content}
+          loading={loading}
+          isMarkdown={isMarkdown}
+          sanitizedHtml={sanitizedHtml}
+          currentChapter={currentChapter}
+          fontSize={fontSize}
+          lineHeight={lineHeight}
+          fontFamily={fontFamily}
+          contentWidth={contentWidth}
+          textAlign={textAlign}
+          paragraphSpacing={paragraphSpacing}
+          animClass={animClass}
+          contentRef={contentRef}
+          onScroll={onScroll}
+          bookId={currentBook.id}
+          chapterId={currentChapter.id}
+        />
 
         {/* Floating chapter navigation - outside scroll container */}
         {chapterIndex > 0 && (
           <button
-            className="absolute left-2 top-1/2 -translate-y-1/2 w-10 h-20 rounded-lg flex items-center justify-center z-40 group"
+            className="absolute left-2 top-1/2 -translate-y-1/2 w-10 h-20 rounded-lg flex items-center justify-center opacity-30 hover:opacity-100 hover:text-[var(--text-primary)]"
             style={{
               background: "var(--bg-elevated)",
               border: "1px solid var(--border)",
               boxShadow: "var(--shadow-md)",
               color: "var(--text-tertiary)",
-              opacity: 0.3,
-              transition: "all 200ms",
+              transition: "all var(--transition-fast)",
+              zIndex: "var(--z-popover)",
             }}
-            onMouseEnter={(e) => { e.currentTarget.style.opacity = "1"; e.currentTarget.style.color = "var(--text-primary)"; }}
-            onMouseLeave={(e) => { e.currentTarget.style.opacity = "0.3"; e.currentTarget.style.color = "var(--text-tertiary)"; }}
             onClick={() => loadChapter(chapters[chapterIndex - 1].id)}
             title="上一章"
           >
@@ -637,17 +605,15 @@ export function Reader() {
         )}
         {chapterIndex < chapters.length - 1 && (
           <button
-            className="absolute right-2 top-1/2 -translate-y-1/2 w-10 h-20 rounded-lg flex items-center justify-center z-40 group"
+            className="absolute right-2 top-1/2 -translate-y-1/2 w-10 h-20 rounded-lg flex items-center justify-center opacity-30 hover:opacity-100 hover:text-[var(--text-primary)]"
             style={{
               background: "var(--bg-elevated)",
               border: "1px solid var(--border)",
               boxShadow: "var(--shadow-md)",
               color: "var(--text-tertiary)",
-              opacity: 0.3,
-              transition: "all 200ms",
+              transition: "all var(--transition-fast)",
+              zIndex: "var(--z-popover)",
             }}
-            onMouseEnter={(e) => { e.currentTarget.style.opacity = "1"; e.currentTarget.style.color = "var(--text-primary)"; }}
-            onMouseLeave={(e) => { e.currentTarget.style.opacity = "0.3"; e.currentTarget.style.color = "var(--text-tertiary)"; }}
             onClick={() => loadChapter(chapters[chapterIndex + 1].id)}
             title="下一章"
           >
@@ -658,69 +624,26 @@ export function Reader() {
         )}
 
         {/* Status bar */}
-        <footer className="flex items-center justify-between px-5 py-2 flex-shrink-0"
-          style={{ borderTop: "1px solid var(--border)", background: "var(--bg-secondary)" }}>
-          <div className="flex items-center gap-4">
-            <span className="text-xs" style={{ color: "var(--text-tertiary)" }}>
-              第 {chapterIndex + 1}/{chapters.length} 章
-            </span>
-            <span className="text-xs" style={{ color: "var(--text-tertiary)" }}>
-              {currentChapter.title}
-            </span>
-            {(() => {
-              const chapterChars = currentChapter.char_count ?? 0;
-              const readRatio = progress?.chapter_id === currentChapter.id ? (progress.scroll_offset ?? 0) : 0;
-              const remainingChars = Math.max(0, chapterChars * (1 - readRatio));
-              const remainingMin = Math.max(1, Math.round(remainingChars / charsPerMinute));
-              return chapterChars > 0 ? (
-                <span className="text-xs" style={{ color: "var(--text-tertiary)" }}>
-                  约剩 {remainingMin} 分钟
-                </span>
-              ) : null;
-            })()}
-          </div>
-          <div className="flex items-center gap-4">
-            <span className="text-xs tabular-nums" style={{ color: "var(--text-tertiary)" }}>
-              {currentBook.total_chars?.toLocaleString() || "?"} 字
-            </span>
-            <div className="w-20 progress-bar">
-              <div className="progress-bar-fill" style={{ width: `${progressPct}%` }} />
-            </div>
-            <span className="text-xs tabular-nums w-8 text-right" style={{ color: "var(--text-tertiary)" }}>{progressPct}%</span>
-          </div>
-        </footer>
+        <ReaderStatusBar
+          chapterIndex={chapterIndex}
+          chapters={chapters}
+          currentChapter={currentChapter}
+          currentBook={currentBook}
+          progress={progress}
+          charsPerMinute={charsPerMinute}
+          dailyGoal={dailyGoal}
+          setDailyGoal={setDailyGoal}
+          todayStats={todayStats}
+          progressPct={progressPct}
+          editingGoal={editingGoal}
+          setEditingGoal={setEditingGoal}
+          goalInput={goalInput}
+          setGoalInput={setGoalInput}
+        />
       </div>
 
       {/* Note panel */}
       <NotePanel bookId={currentBook.id} chapterId={currentChapter.id} visible={showNotes} onClose={() => setShowNotes(false)} onJumpTo={handleJumpTo} />
-    </div>
-  );
-}
-
-/* ---- Small helpers ---- */
-function ToolbarBtn({ onClick, active, title, children }: {
-  onClick: () => void; active?: boolean; title: string; children: React.ReactNode;
-}) {
-  return (
-    <button className={`px-2.5 py-1.5 rounded-lg text-sm flex items-center gap-1.5 hover-bg`}
-      style={{ color: active ? "var(--accent)" : "var(--text-secondary)", background: active ? "var(--accent-soft)" : "transparent" }}
-      onClick={onClick}
-      title={title}>
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">{children}</svg>
-      {title}
-    </button>
-  );
-}
-
-function Divider() {
-  return <div className="w-px h-5 mx-1" style={{ background: "var(--border)" }} />;
-}
-
-function SettingRow({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <div className="flex items-center justify-between px-3 py-1.5">
-      <span className="text-xs" style={{ color: "var(--text-tertiary)" }}>{label}</span>
-      <div className="flex items-center gap-1">{children}</div>
     </div>
   );
 }

@@ -1,13 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
+import DOMPurify from "dompurify";
 import { useAppStore } from "../stores/app";
 
-/** Sanitize FTS5 snippet: escape HTML but preserve <mark> tags */
+/** Sanitize FTS5 snippet: strip all HTML except <mark> tags */
 function sanitizeSnippet(html: string): string {
-  return html
-    .replace(/&(?!amp;|lt;|gt;|quot;|#39;)/g, "&amp;")
-    .replace(/<(?!\/?mark>)/g, "&lt;")
-    .replace(/(?<!<\/?)mark>/g, "&gt;");
+  return DOMPurify.sanitize(html, { ALLOWED_TAGS: ["mark"] });
 }
 
 interface SearchResult {
@@ -54,9 +52,11 @@ const TYPE_ICONS: Record<string, React.ReactNode> = {
 export function SearchPanel({
   visible,
   onClose,
+  query: externalQuery,
 }: {
   visible: boolean;
   onClose: () => void;
+  query?: string;
 }) {
   const [query, setQuery] = useState("");
   const [scope, setScope] = useState("all");
@@ -73,19 +73,23 @@ export function SearchPanel({
     }
   }, [visible]);
 
-  const handleSearch = useCallback(async () => {
-    if (!query.trim()) return;
+  // Sync external query prop to internal state and trigger search
+  useEffect(() => {
+    if (!externalQuery) return;
+    setQuery(externalQuery);
+  }, [externalQuery]);
 
+  const performSearch = useCallback(async (q: string, s: string) => {
+    if (!q.trim()) return;
     setLoading(true);
     try {
       const result = await invoke<SearchResult[]>("search_all", {
-        query: query.trim(),
-        scope,
+        query: q.trim(),
+        scope: s,
       });
       setResults(result);
-
       setSearchHistory((prev) => {
-        const updated = [query.trim(), ...prev.filter((q) => q !== query.trim())].slice(0, 10);
+        const updated = [q.trim(), ...prev.filter((x) => x !== q.trim())].slice(0, 10);
         return updated;
       });
     } catch (e) {
@@ -93,13 +97,25 @@ export function SearchPanel({
     } finally {
       setLoading(false);
     }
-  }, [query, scope]);
+  }, []);
+
+  const handleSearch = useCallback(async () => {
+    await performSearch(query, scope);
+  }, [query, scope, performSearch]);
+
+  // Trigger search when external query changes and panel is visible
+  useEffect(() => {
+    if (externalQuery && visible) {
+      performSearch(externalQuery, scope);
+    }
+  }, [externalQuery, visible, scope, performSearch]);
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter") {
       e.preventDefault();
       handleSearch();
     } else if (e.key === "Escape") {
+      e.stopPropagation(); // keep reader-level keyboard hooks from also consuming it
       onClose();
     }
   };
@@ -129,9 +145,9 @@ export function SearchPanel({
 
   const typeColor = (type: string) => {
     switch (type) {
-      case "book": return "#6366f1";
-      case "content": return "#22c55e";
-      case "annotation": return "#f59e0b";
+      case "book": return "var(--type-book)";
+      case "content": return "var(--type-content)";
+      case "annotation": return "var(--type-annotation)";
       default: return "var(--text-tertiary)";
     }
   };
@@ -140,8 +156,8 @@ export function SearchPanel({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-start justify-center pt-[12vh] animate-fade-in"
-      style={{ background: "rgba(0, 0, 0, 0.4)", backdropFilter: "blur(4px)" }}
+      className="fixed inset-0 flex items-start justify-center pt-[12vh] animate-fade-in"
+      style={{ background: "var(--overlay-bg)", backdropFilter: "blur(4px)", zIndex: "var(--z-modal)" }}
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
@@ -228,7 +244,7 @@ export function SearchPanel({
                     <div
                       className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 mt-0.5"
                       style={{
-                        background: `${typeColor(result.result_type)}15`,
+                        background: `color-mix(in srgb, ${typeColor(result.result_type)} 10%, transparent)`,
                         color: typeColor(result.result_type),
                       }}
                     >
@@ -260,7 +276,7 @@ export function SearchPanel({
                     <span
                       className="text-xs px-1.5 py-0.5 rounded flex-shrink-0"
                       style={{
-                        background: `${typeColor(result.result_type)}10`,
+                        background: `color-mix(in srgb, ${typeColor(result.result_type)} 8%, transparent)`,
                         color: typeColor(result.result_type),
                       }}
                     >

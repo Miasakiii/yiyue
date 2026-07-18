@@ -11,7 +11,26 @@ export function ComicReader() {
   const [currentPage, setCurrentPage] = useState(0);
   const [loading, setLoading] = useState(true);
   const [doublePage, setDoublePage] = useState(false);
+  const [rtl, setRtl] = useState(() => {
+    if (currentBook?.metadata_json) {
+      try {
+        const meta = JSON.parse(currentBook.metadata_json);
+        return meta.reading_direction === "rtl";
+      } catch { return false; }
+    }
+    return false;
+  });
+  const [zoom, setZoom] = useState(() => Number(localStorage.getItem("comic-zoom")) || 1.0);
+  const [pan, setPan] = useState({ x: 0, y: 0 });
+  const [isDragging, setIsDragging] = useState(false);
+  const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
   const containerRef = useRef<HTMLDivElement>(null);
+  const imgElRef = useRef<HTMLImageElement>(null);
+
+  // Persist zoom
+  useEffect(() => {
+    localStorage.setItem("comic-zoom", String(zoom));
+  }, [zoom]);
 
   useEffect(() => {
     if (!currentChapter) return;
@@ -75,16 +94,111 @@ export function ComicReader() {
     }
   }, [currentPage, goToPage, doublePage, pages.length]);
 
+  // In RTL mode, swap prev/next semantics
+  const rtlPrev = useCallback(() => rtl ? nextPage() : prevPage(), [rtl, prevPage, nextPage]);
+  const rtlNext = useCallback(() => rtl ? prevPage() : nextPage(), [rtl, prevPage, nextPage]);
+
   const toggleFullscreen = useFullscreen();
+
+  /* ---- Zoom & Pan ---- */
+  const handleWheel = useCallback((e: WheelEvent) => {
+    if (e.ctrlKey || e.metaKey) {
+      e.preventDefault();
+      const delta = e.deltaY > 0 ? -0.1 : 0.1;
+      setZoom((z) => Math.min(3.0, Math.max(0.5, z + delta)));
+    }
+  }, []);
+
+  // Keep at least `margin` px of the image inside the viewport while panning
+  const clampPan = useCallback((x: number, y: number) => {
+    const container = containerRef.current;
+    const img = imgElRef.current;
+    if (!container || !img) return { x, y };
+    const margin = 80;
+    const rect = img.getBoundingClientRect();
+    const maxX = Math.max(0, (rect.width + container.clientWidth) / 2 - margin);
+    const maxY = Math.max(0, (rect.height + container.clientHeight) / 2 - margin);
+    return {
+      x: Math.min(maxX, Math.max(-maxX, x)),
+      y: Math.min(maxY, Math.max(-maxY, y)),
+    };
+  }, []);
+
+  const handleMouseDown = useCallback((e: React.MouseEvent) => {
+    if (zoom > 1.0 && e.button === 0) {
+      setIsDragging(true);
+      setDragStart({ x: e.clientX - pan.x, y: e.clientY - pan.y });
+    }
+  }, [zoom, pan]);
+
+  const handleMouseMove = useCallback((e: React.MouseEvent) => {
+    if (!isDragging) return;
+    setPan(clampPan(e.clientX - dragStart.x, e.clientY - dragStart.y));
+  }, [isDragging, dragStart, clampPan]);
+
+  const handleMouseUp = useCallback(() => {
+    setIsDragging(false);
+  }, []);
+
+  const computeFit = useCallback((mode: "width" | "height") => {
+    const container = containerRef.current;
+    const img = imgElRef.current;
+    if (!container || !img) return;
+    // getBoundingClientRect() includes the current scale() transform,
+    // so divide by zoom to recover the untransformed layout size
+    const rect = img.getBoundingClientRect();
+    if (rect.width === 0 || rect.height === 0) return;
+    const baseW = rect.width / zoom;
+    const baseH = rect.height / zoom;
+    const target = mode === "width"
+      ? container.clientWidth / baseW
+      : container.clientHeight / baseH;
+    setZoom(Math.min(5.0, Math.max(0.1, target)));
+    setPan({ x: 0, y: 0 });
+  }, [zoom]);
+
+  const fitWidth = useCallback(() => computeFit("width"), [computeFit]);
+
+  const fitHeight = useCallback(() => computeFit("height"), [computeFit]);
+
+  const resetZoom = useCallback(() => {
+    setZoom(1.0);
+    setPan({ x: 0, y: 0 });
+  }, []);
+
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+    container.addEventListener("wheel", handleWheel, { passive: false });
+    return () => container.removeEventListener("wheel", handleWheel);
+  }, [handleWheel]);
+
+  // Keyboard shortcuts for zoom
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement | null;
+      if (target?.closest?.("input, textarea, select, [contenteditable]")) return;
+      if (e.key === "w" || e.key === "W") fitWidth();
+      if (e.key === "h" || e.key === "H") fitHeight();
+      if (e.key === "0" && (e.ctrlKey || e.metaKey)) {
+        e.preventDefault();
+        resetZoom();
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [fitWidth, fitHeight, resetZoom]);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement | null;
+      if (target?.closest?.("input, textarea, select, [contenteditable]")) return;
       if (e.key === "ArrowRight" || e.key === "PageDown" || e.key === " ") {
         e.preventDefault();
-        nextPage();
+        rtlNext();
       } else if (e.key === "ArrowLeft" || e.key === "PageUp") {
         e.preventDefault();
-        prevPage();
+        rtlPrev();
       } else if (e.key === "Home") {
         e.preventDefault();
         goToPage(0);
@@ -94,6 +208,9 @@ export function ComicReader() {
       } else if (e.key === "d" || e.key === "D") {
         e.preventDefault();
         setDoublePage((v) => !v);
+      } else if (e.key === "r" || e.key === "R") {
+        e.preventDefault();
+        setRtl((v) => !v);
       } else if (e.key === "F11") {
         e.preventDefault();
         toggleFullscreen();
@@ -101,22 +218,23 @@ export function ComicReader() {
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [nextPage, prevPage, goToPage, pages, toggleFullscreen]);
+  }, [rtlNext, rtlPrev, goToPage, pages.length, toggleFullscreen]);
 
   useEffect(() => {
     const container = containerRef.current;
     if (!container) return;
     let wheelTimeout: ReturnType<typeof setTimeout> | null = null;
     const handleWheel = (e: WheelEvent) => {
+      if (e.ctrlKey || e.metaKey) return; // Ctrl+wheel is handled by the zoom listener
       e.preventDefault();
       if (wheelTimeout) return;
       wheelTimeout = setTimeout(() => { wheelTimeout = null; }, 150);
-      if (e.deltaY > 0) nextPage();
-      else if (e.deltaY < 0) prevPage();
+      if (e.deltaY > 0) rtlNext();
+      else if (e.deltaY < 0) rtlPrev();
     };
     container.addEventListener("wheel", handleWheel, { passive: false });
     return () => container.removeEventListener("wheel", handleWheel);
-  }, [nextPage, prevPage]);
+  }, [rtlNext, rtlPrev]);
 
   const { closeBook } = useAppStore.getState();
   const goBack = () => {
@@ -144,10 +262,8 @@ export function ComicReader() {
       <header className="flex items-center justify-between px-5 py-2.5 flex-shrink-0"
         style={{ borderBottom: "1px solid var(--border)", background: "var(--bg-elevated)" }}>
         <div className="flex items-center gap-2">
-          <button className="px-2.5 py-1.5 rounded-lg text-sm flex items-center gap-1.5" style={{ color: "var(--text-secondary)" }}
-            onClick={goBack}
-            onMouseEnter={(e) => { e.currentTarget.style.background = "var(--bg-tertiary)"; }}
-            onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}>
+          <button className="px-2.5 py-1.5 rounded-lg text-sm flex items-center gap-1.5 hover-bg" style={{ color: "var(--text-secondary)" }}
+            onClick={goBack}>
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <path d="M19 12H5M12 19l-7-7 7-7" />
             </svg>
@@ -159,9 +275,9 @@ export function ComicReader() {
         <div className="flex items-center gap-1">
           {/* Theme toggle */}
           {THEMES.map((t) => (
-            <button key={t.key} className="px-2 py-1 rounded-md text-xs"
+            <button key={t.key} className="px-2 py-1 rounded-md text-xs hover-bg"
               style={{
-                background: theme === t.key ? "var(--accent-soft)" : "transparent",
+                background: theme === t.key ? "var(--accent-soft)" : undefined,
                 color: theme === t.key ? "var(--accent)" : "var(--text-tertiary)",
               }}
               onClick={() => setTheme(t.key)}>{t.label}</button>
@@ -171,9 +287,9 @@ export function ComicReader() {
 
           {/* Double page toggle */}
           {!isWebtoon && (
-            <button className="px-2 py-1.5 rounded-lg text-xs"
+            <button className="px-2 py-1.5 rounded-lg text-xs hover-bg"
               style={{
-                background: doublePage ? "var(--accent-soft)" : "transparent",
+                background: doublePage ? "var(--accent-soft)" : undefined,
                 color: doublePage ? "var(--accent)" : "var(--text-tertiary)",
               }}
               onClick={() => setDoublePage((v) => !v)}
@@ -185,10 +301,61 @@ export function ComicReader() {
             </button>
           )}
 
+          {/* RTL toggle */}
+          {!isWebtoon && (
+            <button className="px-2 py-1.5 rounded-lg text-xs hover-bg"
+              style={{
+                background: rtl ? "var(--accent-soft)" : undefined,
+                color: rtl ? "var(--accent)" : "var(--text-tertiary)",
+              }}
+              onClick={() => setRtl((v) => !v)}
+              title="右到左阅读 (R)"
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M21 4v16" />
+                <path d="M16 12H6" />
+                <path d="M10 8l-4 4 4 4" />
+              </svg>
+            </button>
+          )}
+
+          <div className="w-px h-5 mx-1" style={{ background: "var(--border)" }} />
+
+          {/* Zoom controls — only in single-page mode */}
+          {!isWebtoon && !doublePage && (
+            <>
+              <button className="px-2 py-1.5 rounded-lg text-xs hover-bg"
+                style={{ color: "var(--text-tertiary)" }}
+                onClick={() => setZoom((z) => Math.min(3.0, z + 0.2))}
+                title="放大 (Ctrl+滚轮)">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" /><line x1="11" y1="8" x2="11" y2="14" /><line x1="8" y1="11" x2="14" y2="11" />
+                </svg>
+              </button>
+              <span className="text-xs tabular-nums px-1" style={{ color: "var(--text-tertiary)" }}>
+                {Math.round(zoom * 100)}%
+              </span>
+              <button className="px-2 py-1.5 rounded-lg text-xs hover-bg"
+                style={{ color: "var(--text-tertiary)" }}
+                onClick={() => setZoom((z) => Math.max(0.5, z - 0.2))}
+                title="缩小">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" /><line x1="8" y1="11" x2="14" y2="11" />
+                </svg>
+              </button>
+              <button className="px-2 py-1.5 rounded-lg text-xs hover-bg"
+                style={{ color: zoom !== 1.0 ? "var(--accent)" : "var(--text-tertiary)" }}
+                onClick={resetZoom}
+                title="重置缩放 (Ctrl+0)">
+                1:1
+              </button>
+            </>
+          )}
+
           <div className="w-px h-5 mx-1" style={{ background: "var(--border)" }} />
 
           {/* Page nav */}
-          <button className="px-2 py-1.5 rounded-lg" style={{ color: currentPage > 0 ? "var(--text-secondary)" : "var(--text-tertiary)" }}
+          <button className={`px-2 py-1.5 rounded-lg${currentPage > 0 ? " hover-bg" : ""}`} style={{ color: currentPage > 0 ? "var(--text-secondary)" : "var(--text-tertiary)" }}
             onClick={prevPage} disabled={currentPage === 0}>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <path d="M15 18l-6-6 6-6" />
@@ -199,7 +366,7 @@ export function ComicReader() {
               ? `${currentPage + 1}-${currentPage + 2}`
               : currentPage + 1} / {pages.length}
           </span>
-          <button className="px-2 py-1.5 rounded-lg" style={{ color: currentPage < pages.length - 1 ? "var(--text-secondary)" : "var(--text-tertiary)" }}
+          <button className={`px-2 py-1.5 rounded-lg${currentPage < pages.length - 1 ? " hover-bg" : ""}`} style={{ color: currentPage < pages.length - 1 ? "var(--text-secondary)" : "var(--text-tertiary)" }}
             onClick={nextPage} disabled={currentPage === pages.length - 1}>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <path d="M9 18l6-6-6-6" />
@@ -239,23 +406,64 @@ export function ComicReader() {
           </div>
         ) : doublePage && currentPage < pages.length - 1 ? (
           <div className="flex items-center justify-center h-full gap-1">
-            <img src={`asset://localhost/${pages[currentPage]?.image_path}`} alt={pages[currentPage]?.file_name}
-              className="max-h-full max-w-[50%] object-contain" style={{ userSelect: "none" }} />
-            <img src={`asset://localhost/${pages[currentPage + 1]?.image_path}`} alt={pages[currentPage + 1]?.file_name}
-              className="max-h-full max-w-[50%] object-contain" style={{ userSelect: "none" }} />
+            {rtl ? (
+              <>
+                <img src={`asset://localhost/${pages[currentPage + 1]?.image_path}`} alt={pages[currentPage + 1]?.file_name}
+                  className="max-h-full max-w-[50%] object-contain" style={{ userSelect: "none" }} />
+                <img src={`asset://localhost/${pages[currentPage]?.image_path}`} alt={pages[currentPage]?.file_name}
+                  className="max-h-full max-w-[50%] object-contain" style={{ userSelect: "none" }} />
+              </>
+            ) : (
+              <>
+                <img src={`asset://localhost/${pages[currentPage]?.image_path}`} alt={pages[currentPage]?.file_name}
+                  className="max-h-full max-w-[50%] object-contain" style={{ userSelect: "none" }} />
+                <img src={`asset://localhost/${pages[currentPage + 1]?.image_path}`} alt={pages[currentPage + 1]?.file_name}
+                  className="max-h-full max-w-[50%] object-contain" style={{ userSelect: "none" }} />
+              </>
+            )}
           </div>
         ) : (
-          <div className="flex items-center justify-center h-full">
-            <img src={`asset://localhost/${pages[currentPage]?.image_path}`} alt={pages[currentPage]?.file_name}
-              className="max-w-full max-h-full object-contain" style={{ userSelect: "none" }} />
+          <div
+            className="flex items-center justify-center h-full"
+            style={{
+              cursor: zoom > 1.0 ? (isDragging ? "grabbing" : "grab") : "default",
+              overflow: "hidden",
+            }}
+            onMouseDown={handleMouseDown}
+            onMouseMove={handleMouseMove}
+            onMouseUp={handleMouseUp}
+            onMouseLeave={handleMouseUp}
+          >
+            <div style={{
+              transform: `scale(${zoom}) translate(${pan.x / zoom}px, ${pan.y / zoom}px)`,
+              transition: isDragging ? "none" : "transform 150ms ease-out",
+              transformOrigin: "center center",
+            }}>
+              <img ref={imgElRef} src={`asset://localhost/${pages[currentPage]?.image_path}`} alt={pages[currentPage]?.file_name}
+                className="max-w-full max-h-full object-contain" style={{ userSelect: "none", pointerEvents: "none" }} />
+            </div>
           </div>
         )}
 
-        {/* Click areas */}
-        {!isWebtoon && (
+        {/* Click areas — disabled when zoomed in (allow pan instead) */}
+        {!isWebtoon && zoom <= 1.0 && (
           <>
-            <div className="absolute left-0 top-0 w-1/4 h-full cursor-pointer" onClick={prevPage} />
-            <div className="absolute right-0 top-0 w-1/4 h-full cursor-pointer" onClick={nextPage} />
+            <div className="absolute left-0 top-0 w-1/4 h-full cursor-pointer group" onClick={rtlPrev}>
+              <div className="absolute left-4 top-1/2 -translate-y-1/2 rounded-full p-2 opacity-0 group-hover:opacity-100 transition-opacity"
+                style={{ background: "var(--bg-elevated)", color: "var(--text-tertiary)", border: "1px solid var(--border)", boxShadow: "var(--shadow-md)" }}>
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M15 18l-6-6 6-6" />
+                </svg>
+              </div>
+            </div>
+            <div className="absolute right-0 top-0 w-1/4 h-full cursor-pointer group" onClick={rtlNext}>
+              <div className="absolute right-4 top-1/2 -translate-y-1/2 rounded-full p-2 opacity-0 group-hover:opacity-100 transition-opacity"
+                style={{ background: "var(--bg-elevated)", color: "var(--text-tertiary)", border: "1px solid var(--border)", boxShadow: "var(--shadow-md)" }}>
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M9 18l6-6-6-6" />
+                </svg>
+              </div>
+            </div>
           </>
         )}
       </div>
@@ -263,7 +471,7 @@ export function ComicReader() {
       {/* Page slider */}
       {!isWebtoon && pages.length > 1 && (
         <footer className="px-5 py-2.5 flex items-center gap-4 flex-shrink-0"
-          style={{ borderTop: "1px solid var(--border)", background: "var(--bg-secondary)" }}>
+          style={{ borderTop: "1px solid var(--border)", background: "var(--bg-elevated)" }}>
           <input type="range" className="flex-1 h-1 rounded-full appearance-none cursor-pointer"
             style={{
               accentColor: "var(--accent)",

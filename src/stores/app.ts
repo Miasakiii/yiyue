@@ -16,6 +16,8 @@ import type {
   RuleGroup,
   CreateRule,
   UpdateRule,
+  Bookmark,
+  CreateBookmark,
 } from "../types";
 
 interface AppState {
@@ -31,6 +33,9 @@ interface AppState {
   currentChapter: Chapter | null;
   progress: ReadingProgress | null;
   readingProfile: ReadingProfile | null;
+  // Bumped when the open book's content changes in place (e.g. rules applied)
+  // so the Reader refetches the current chapter text.
+  contentVersion: number;
 
   // Tags & Groups
   tags: Tag[];
@@ -43,6 +48,9 @@ interface AppState {
   ruleGroups: RuleGroup[];
   rulesLoading: boolean;
 
+  // Bookmarks
+  bookmarks: Bookmark[];
+
   // Theme
   theme: "light" | "dark" | "sepia";
 
@@ -52,7 +60,7 @@ interface AppState {
   setViewMode: (mode: "grid" | "list") => void;
   openBook: (bookId: string) => Promise<void>;
   closeBook: () => void;
-  loadChapter: (chapterId: string) => Promise<string>;
+  loadChapter: (chapterId: string) => Promise<void>;
   updateProgress: (bookId: string, progress: UpdateProgress) => Promise<void>;
   toggleFavorite: (bookId: string) => Promise<void>;
   deleteBook: (bookId: string) => Promise<void>;
@@ -92,6 +100,11 @@ interface AppState {
   createRuleGroup: (name: string, description?: string, isPreset?: boolean) => Promise<RuleGroup>;
   deleteRuleGroup: (id: string) => Promise<void>;
   applyRulesToBook: (bookId: string) => Promise<number>;
+
+  // Bookmark actions
+  loadBookmarks: (bookId: string) => Promise<void>;
+  createBookmark: (bookmark: CreateBookmark) => Promise<Bookmark>;
+  deleteBookmark: (id: string) => Promise<void>;
 }
 
 export const useAppStore = create<AppState>((set, get) => ({
@@ -104,6 +117,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   currentChapter: null,
   progress: null,
   readingProfile: null,
+  contentVersion: 0,
   tags: [],
   groups: [],
   activeTag: null,
@@ -111,6 +125,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   rules: [],
   ruleGroups: [],
   rulesLoading: false,
+  bookmarks: [],
 
   theme: (localStorage.getItem("reader-theme") as "light" | "dark" | "sepia") || "light",
 
@@ -148,7 +163,10 @@ export const useAppStore = create<AppState>((set, get) => ({
         bookId,
       });
 
-      set({ currentBook: book, chapters, progress, readingProfile: profile });
+      set({ currentBook: book, chapters, progress, readingProfile: profile, bookmarks: [] });
+
+      // Load bookmarks for this book
+      get().loadBookmarks(bookId);
 
       // Load the current chapter — always resolve to a valid chapter
       let chapter: Chapter | undefined;
@@ -167,25 +185,17 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   closeBook: () => {
-    set({ currentBook: null, chapters: [], currentChapter: null, progress: null, readingProfile: null });
+    set({ currentBook: null, chapters: [], currentChapter: null, progress: null, readingProfile: null, bookmarks: [] });
   },
 
   loadChapter: async (chapterId: string) => {
+    // Only switch the current chapter here. Content fetching happens in the
+    // Reader component's own effect (the single fetch point), so flipping
+    // chapters no longer fires the same get_chapter_content IPC twice.
     const chapter = get().chapters.find((c) => c.id === chapterId);
     if (chapter) {
       set({ currentChapter: chapter });
-      // Fetch content via IPC — the Reader component also does this in its
-      // own useEffect, but having it here allows callers (e.g. keyboard nav)
-      // to preload content without waiting for the Reader to re-render.
-      try {
-        const content = await invoke<string>("get_chapter_content", { chapterId });
-        return content;
-      } catch (e) {
-        console.error("Failed to load chapter content:", e);
-        return "";
-      }
     }
-    return "";
   },
 
   updateProgress: async (bookId: string, progress: UpdateProgress) => {
@@ -439,7 +449,10 @@ export const useAppStore = create<AppState>((set, get) => ({
         isRegex: updates.is_regex,
         enabled: updates.enabled,
         priority: updates.priority,
-        groupId: updates.group_id,
+        groupId: updates.group_id ?? undefined,
+        // Explicit null means "clear the group" — the backend can't tell an
+        // omitted arg from a null one, so it reads this flag instead.
+        clearGroup: updates.group_id === null ? true : undefined,
         description: updates.description,
       });
       get().loadRules();
@@ -485,7 +498,53 @@ export const useAppStore = create<AppState>((set, get) => ({
     }
   },
 
-  applyRulesToBook: async (_bookId: string) => {
-    return 0;
+  applyRulesToBook: async (bookId: string) => {
+    try {
+      const count = await invoke<number>("apply_rules_to_book", { bookId });
+      // If the currently open book is affected, bump contentVersion so the
+      // Reader's content effect refetches the cleaned text (loadChapter alone
+      // would set the same chapter reference and not retrigger the effect).
+      if (get().currentBook?.id === bookId) {
+        set({ contentVersion: get().contentVersion + 1 });
+      }
+      get().loadBooks();
+      return count;
+    } catch (e) {
+      console.error("Failed to apply rules to book:", e);
+      showToast("应用规则失败", "error");
+      return 0;
+    }
+  },
+
+  // Bookmark actions
+  loadBookmarks: async (bookId: string) => {
+    try {
+      const bookmarks = await invoke<Bookmark[]>("get_bookmarks", { bookId });
+      set({ bookmarks });
+    } catch (e) {
+      console.error("Failed to load bookmarks:", e);
+    }
+  },
+
+  createBookmark: async (bookmark: CreateBookmark) => {
+    try {
+      const created = await invoke<Bookmark>("create_bookmark", { bookmark });
+      set({ bookmarks: [created, ...get().bookmarks] });
+      return created;
+    } catch (e) {
+      console.error("Failed to create bookmark:", e);
+      showToast("添加书签失败", "error");
+      throw e;
+    }
+  },
+
+  deleteBookmark: async (id: string) => {
+    try {
+      await invoke("delete_bookmark", { id });
+      set({ bookmarks: get().bookmarks.filter((b) => b.id !== id) });
+    } catch (e) {
+      console.error("Failed to delete bookmark:", e);
+      showToast("删除书签失败", "error");
+    }
   },
 }));

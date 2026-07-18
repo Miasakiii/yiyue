@@ -1,5 +1,14 @@
 @import "tailwindcss";
 
+/* Unify Tailwind rounded-* utilities with the --radius-* design tokens (6/10/14/20px).
+   The :root block below keeps the same values so var(--radius-*) references stay valid. */
+@theme {
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+  --radius-xl: 20px;
+}
+
 :root {
   --bg-primary: #ffffff;
   --bg-secondary: #f8fafc;
@@ -25,6 +34,28 @@
   --transition-fast: 150ms cubic-bezier(0.4, 0, 0.2, 1);
   --transition-normal: 250ms cubic-bezier(0.4, 0, 0.2, 1);
   --transition-slow: 350ms cubic-bezier(0.4, 0, 0.2, 1);
+
+  /* Semantic status colors */
+  --error: #ef4444;
+  --error-soft: rgba(239, 68, 68, 0.1);
+  --success: #22c55e;
+  --success-soft: rgba(34, 197, 94, 0.1);
+  --warning: #f59e0b;
+  --warning-soft: rgba(245, 158, 11, 0.12);
+
+  /* Modal / search overlay backdrop (replaces hardcoded rgba(0, 0, 0, 0.4)) */
+  --overlay-bg: rgba(15, 23, 42, 0.4);
+
+  /* Search result type colors */
+  --type-book: #6366f1;
+  --type-content: #22c55e;
+  --type-annotation: #f59e0b;
+
+  /* z-index scale (theme-independent): popover 40 / modal 50 / toast 60.
+     New code should use var(--z-*) instead of bare z-40 / z-50 / z-[9999] values. */
+  --z-popover: 40;
+  --z-modal: 50;
+  --z-toast: 60;
 }
 
 .dark {
@@ -45,6 +76,20 @@
   --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.3);
   --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.35);
   --shadow-xl: 0 16px 48px rgba(0, 0, 0, 0.4);
+
+  /* Semantic status colors (brightened for dark backgrounds) */
+  --error: #f87171;
+  --error-soft: rgba(248, 113, 113, 0.14);
+  --success: #4ade80;
+  --success-soft: rgba(74, 222, 128, 0.14);
+  --warning: #fbbf24;
+  --warning-soft: rgba(251, 191, 36, 0.14);
+
+  --overlay-bg: rgba(0, 0, 0, 0.6);
+
+  --type-book: #818cf8;
+  --type-content: #4ade80;
+  --type-annotation: #fbbf24;
 }
 
 .sepia {
@@ -65,6 +110,20 @@
   --shadow-md: 0 4px 12px rgba(60, 46, 30, 0.07);
   --shadow-lg: 0 8px 24px rgba(60, 46, 30, 0.09);
   --shadow-xl: 0 16px 48px rgba(60, 46, 30, 0.12);
+
+  /* Semantic status colors (warm-toned to match the sepia palette) */
+  --error: #c05a3f;
+  --error-soft: rgba(192, 90, 63, 0.12);
+  --success: #7d9153;
+  --success-soft: rgba(125, 145, 83, 0.15);
+  --warning: #c98a2b;
+  --warning-soft: rgba(201, 138, 43, 0.15);
+
+  --overlay-bg: rgba(67, 52, 34, 0.35);
+
+  --type-book: #9a7b4e;
+  --type-content: #7d9153;
+  --type-annotation: #c98a2b;
 }
 
 * {
@@ -510,41 +569,24 @@ input[type="range"]::-moz-range-thumb {
   box-shadow: 0 1px 0 var(--border);
 }
 
-/* Toast theme colors */
+/* Toast colors — driven by semantic tokens, adapts to light/dark/sepia automatically.
+   (The old .dark / .sepia .toast-* hex overrides are no longer needed and were removed.) */
 .toast-info {
   background: var(--bg-elevated);
   color: var(--text-primary);
   border: 1px solid var(--border);
 }
 .toast-error {
-  background: #fef2f2;
-  color: #b91c1c;
-  border: 1px solid #fecaca;
+  background: var(--error-soft);
+  color: var(--error);
+  border: 1px solid var(--error);
+  border: 1px solid color-mix(in srgb, var(--error) 35%, transparent);
 }
 .toast-success {
-  background: #f0fdf4;
-  color: #15803d;
-  border: 1px solid #bbf7d0;
-}
-.dark .toast-error {
-  background: #451a1a;
-  color: #fca5a5;
-  border: 1px solid #7f1d1d;
-}
-.dark .toast-success {
-  background: #14412a;
-  color: #86efac;
-  border: 1px solid #166534;
-}
-.sepia .toast-error {
-  background: #fef2f2;
-  color: #b91c1c;
-  border: 1px solid #fecaca;
-}
-.sepia .toast-success {
-  background: #f0fdf4;
-  color: #15803d;
-  border: 1px solid #bbf7d0;
+  background: var(--success-soft);
+  color: var(--success);
+  border: 1px solid var(--success);
+  border: 1px solid color-mix(in srgb, var(--success) 35%, transparent);
 }
 
 /* Unified progress bar */

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { HIGHLIGHT_COLORS } from "../constants";
 
@@ -37,6 +37,19 @@ export function NotePanel({
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editText, setEditText] = useState("");
   const [showExport, setShowExport] = useState(false);
+  const exportRef = useRef<HTMLDivElement>(null);
+
+  // Close the export menu when clicking outside of it
+  useEffect(() => {
+    if (!showExport) return;
+    const onMouseDown = (e: MouseEvent) => {
+      if (exportRef.current && !exportRef.current.contains(e.target as Node)) {
+        setShowExport(false);
+      }
+    };
+    document.addEventListener("mousedown", onMouseDown);
+    return () => document.removeEventListener("mousedown", onMouseDown);
+  }, [showExport]);
 
   const handleExport = useCallback(async (format: string) => {
     try {
@@ -119,14 +132,24 @@ export function NotePanel({
       ? annotations
       : annotations.filter((a) => a.color === filter);
 
+  const colorCounts = useMemo(() => {
+    const counts: Record<string, number> = {};
+    for (const a of annotations) {
+      counts[a.color] = (counts[a.color] || 0) + 1;
+    }
+    return counts;
+  }, [annotations]);
+
   if (!visible) return null;
 
   return (
     <div
-      className="w-80 flex-shrink-0 border-l flex flex-col h-full"
+      className="fixed right-0 top-0 bottom-0 w-80 border-l flex flex-col animate-slide-right"
       style={{
         background: "var(--bg-secondary)",
         borderColor: "var(--border)",
+        boxShadow: "var(--shadow-xl)",
+        zIndex: "var(--z-modal)",
       }}
     >
       {/* Header */}
@@ -136,9 +159,9 @@ export function NotePanel({
       >
         <span className="font-medium text-sm">笔记与划线</span>
         <div className="flex items-center gap-2">
-          <div className="relative">
+          <div className="relative" ref={exportRef}>
             <button
-              className="text-xs px-2 py-0.5 rounded"
+              className="text-xs px-2 py-0.5 rounded hover-bg"
               style={{ color: "var(--text-secondary)" }}
               onClick={() => setShowExport(!showExport)}
             >
@@ -146,17 +169,18 @@ export function NotePanel({
             </button>
             {showExport && (
               <div
-                className="absolute right-0 top-full mt-1 rounded-lg shadow-lg z-10 py-1"
+                className="absolute right-0 top-full mt-1 rounded-lg z-10 py-1"
                 style={{
                   background: "var(--bg-secondary)",
                   border: "1px solid var(--border)",
+                  boxShadow: "var(--shadow-lg)",
                   minWidth: "120px",
                 }}
               >
                 {["markdown", "html", "json"].map((fmt) => (
                   <button
                     key={fmt}
-                    className="w-full text-left px-3 py-1.5 text-xs hover:bg-opacity-50"
+                    className="w-full text-left px-3 py-1.5 text-xs hover-bg"
                     style={{ color: "var(--text-primary)" }}
                     onClick={() => handleExport(fmt)}
                   >
@@ -207,13 +231,33 @@ export function NotePanel({
         ))}
       </div>
 
+      {/* Color stats */}
+      {annotations.length > 0 && (
+        <div className="px-4 py-2 border-b flex items-center gap-3" style={{ borderColor: "var(--border)" }}>
+          {HIGHLIGHT_COLORS.map((c) => {
+            const count = colorCounts[c.color] || 0;
+            if (count === 0) return null;
+            return (
+              <div key={c.color} className="flex items-center gap-1">
+                <div className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ background: c.color }} />
+                <span className="text-xs tabular-nums" style={{ color: "var(--text-tertiary)" }}>{count}</span>
+              </div>
+            );
+          })}
+          <span className="text-xs ml-auto" style={{ color: "var(--text-tertiary)" }}>
+            共 {annotations.length} 条
+          </span>
+        </div>
+      )}
+
       {/* Annotations list */}
       <div className="flex-1 overflow-y-auto">
         {filteredAnnotations.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full gap-2">
-            <div style={{ color: "var(--text-tertiary)", fontSize: "2rem" }}>
-              📝
-            </div>
+            <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="var(--text-tertiary)" strokeWidth="1.5" opacity="0.4">
+              <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+              <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+            </svg>
             <div
               className="text-sm"
               style={{ color: "var(--text-secondary)" }}

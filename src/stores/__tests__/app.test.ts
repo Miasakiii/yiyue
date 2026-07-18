@@ -21,6 +21,7 @@ describe("useAppStore", () => {
       chapters: [],
       currentChapter: null,
       progress: null,
+      contentVersion: 0,
       tags: [],
       groups: [],
     });
@@ -162,6 +163,40 @@ describe("useAppStore", () => {
       expect(state.chapters).toEqual([]);
       expect(state.currentChapter).toBeNull();
       expect(state.progress).toBeNull();
+    });
+  });
+
+  describe("applyRulesToBook", () => {
+    it("should bump contentVersion when rules are applied to the open book", async () => {
+      mockInvoke
+        .mockResolvedValueOnce(3) // apply_rules_to_book → replaced count
+        .mockResolvedValueOnce([]); // loadBooks → get_books
+      useAppStore.setState({
+        currentBook: { id: "b1" } as any,
+        currentChapter: { id: "c1" } as any,
+        contentVersion: 0,
+      });
+
+      const count = await useAppStore.getState().applyRulesToBook("b1");
+
+      expect(count).toBe(3);
+      expect(mockInvoke).toHaveBeenCalledWith("apply_rules_to_book", { bookId: "b1" });
+      expect(useAppStore.getState().contentVersion).toBe(1);
+    });
+
+    it("should not bump contentVersion when another book is affected", async () => {
+      mockInvoke
+        .mockResolvedValueOnce(1)
+        .mockResolvedValueOnce([]);
+      useAppStore.setState({
+        currentBook: { id: "b1" } as any,
+        currentChapter: { id: "c1" } as any,
+        contentVersion: 5,
+      });
+
+      await useAppStore.getState().applyRulesToBook("other-book");
+
+      expect(useAppStore.getState().contentVersion).toBe(5);
     });
   });
 });

@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
 import { invoke } from "@tauri-apps/api/core";
+import { PageHeader, Button } from "../components/ui";
 
 interface ReadingStats {
   total_duration_ms: number;
@@ -41,16 +41,17 @@ function formatChars(chars: number): string {
 }
 
 export function Stats() {
-  const navigate = useNavigate();
   const [stats, setStats] = useState<ReadingStats | null>(null);
   const [dailyStats, setDailyStats] = useState<DailyStats[]>([]);
   const [bookStats, setBookStats] = useState<BookStats[]>([]);
+  const [error, setError] = useState("");
 
   useEffect(() => {
     loadData();
   }, []);
 
   const loadData = async () => {
+    setError("");
     try {
       const [s, d, b] = await Promise.all([
         invoke<ReadingStats>("get_reading_stats"),
@@ -62,33 +63,42 @@ export function Stats() {
       setBookStats(b);
     } catch (e) {
       console.error("Failed to load stats:", e);
+      setError("加载统计数据失败，请重试");
     }
   };
 
+  // Calendar cells covering the last ~90 days, padded back to Monday so the
+  // grid aligns to whole weeks (one column per week, rows = Mon..Sun).
   const generateCalendarData = () => {
-    const days: { date: string; duration: number; level: number }[] = [];
+    const days: { date: string; duration: number; chars: number; level: number }[] = [];
     const today = new Date();
-    const statsMap = new Map(dailyStats.map((d) => [d.date, d.duration_ms]));
+    const statsMap = new Map(dailyStats.map((d) => [d.date, d]));
 
-    for (let i = 89; i >= 0; i--) {
-      const d = new Date(today);
-      d.setDate(d.getDate() - i);
+    const start = new Date(today);
+    start.setDate(start.getDate() - 89);
+    // Shift back to the Monday of that week (getUTCDay: 0=Sun..6=Sat).
+    start.setDate(start.getDate() - ((start.getUTCDay() + 6) % 7));
+
+    for (const d = new Date(start); d <= today; d.setDate(d.getDate() + 1)) {
       const dateStr = d.toISOString().split("T")[0];
-      const duration = statsMap.get(dateStr) || 0;
+      const entry = statsMap.get(dateStr);
+      const duration = entry?.duration_ms || 0;
+      const chars = entry?.chars_read || 0;
       const level = duration === 0 ? 0 : duration < 600000 ? 1 : duration < 1800000 ? 2 : duration < 3600000 ? 3 : 4;
-      days.push({ date: dateStr, duration, level });
+      days.push({ date: dateStr, duration, chars, level });
     }
     return days;
   };
 
   const calendarData = generateCalendarData();
 
+  // Accent-tinted levels — adapts to light/dark/sepia via the accent token.
   const HEAT_COLORS = [
     "var(--bg-tertiary)",
-    "#c6dbef",
-    "#6baed6",
-    "#2171b5",
-    "#08306b",
+    "color-mix(in srgb, var(--accent) 25%, transparent)",
+    "color-mix(in srgb, var(--accent) 45%, transparent)",
+    "color-mix(in srgb, var(--accent) 65%, transparent)",
+    "var(--accent)",
   ];
 
   return (
@@ -96,38 +106,31 @@ export function Stats() {
       className="flex flex-col h-screen"
       style={{ background: "var(--bg-primary)", color: "var(--text-primary)" }}
     >
-      {/* Header */}
-      <header
-        className="flex items-center justify-between px-8 py-5 flex-shrink-0"
-        style={{
-          borderBottom: "1px solid var(--border)",
-          background: "var(--bg-elevated)",
-        }}
-      >
-        <div className="flex items-center gap-3">
-          <button
-            className="px-2.5 py-1.5 rounded-lg text-sm flex items-center gap-1.5"
-            style={{ color: "var(--text-secondary)" }}
-            onClick={() => navigate("/")}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.background = "var(--bg-tertiary)";
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.background = "transparent";
-            }}
-          >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M19 12H5M12 19l-7-7 7-7" />
-            </svg>
-            返回
-          </button>
-          <h1 className="text-lg font-semibold">阅读统计</h1>
-        </div>
-      </header>
+      <PageHeader title="阅读统计" />
 
       {/* Content */}
       <main className="flex-1 overflow-y-auto p-8">
-        {stats ? (
+        {error ? (
+          <div className="max-w-4xl mx-auto">
+            <div
+              className="rounded-xl p-10 flex flex-col items-center gap-4"
+              style={{
+                background: "var(--bg-secondary)",
+                border: "1px solid var(--border-light)",
+              }}
+            >
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--error)" strokeWidth="2">
+                <circle cx="12" cy="12" r="10" />
+                <line x1="12" y1="8" x2="12" y2="12" />
+                <line x1="12" y1="16" x2="12.01" y2="16" />
+              </svg>
+              <div className="text-sm" style={{ color: "var(--error)" }}>{error}</div>
+              <Button variant="secondary" size="sm" onClick={loadData}>
+                重新加载
+              </Button>
+            </div>
+          </div>
+        ) : stats ? (
           <div className="max-w-4xl mx-auto space-y-6 animate-fade-in">
             {/* Overview cards */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -140,7 +143,7 @@ export function Stats() {
                     <polyline points="12 6 12 12 16 14" />
                   </svg>
                 }
-                color="#6366f1"
+                color="var(--accent)"
               />
               <StatCard
                 label="总阅读字数"
@@ -150,7 +153,7 @@ export function Stats() {
                     <path d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
                   </svg>
                 }
-                color="#8b5cf6"
+                color="var(--success)"
               />
               <StatCard
                 label="连续阅读"
@@ -160,7 +163,7 @@ export function Stats() {
                     <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" />
                   </svg>
                 }
-                color="#f59e0b"
+                color="var(--warning)"
               />
               <StatCard
                 label="最长连续"
@@ -171,7 +174,7 @@ export function Stats() {
                     <polyline points="8.21 13.89 7 23 12 20 17 23 15.79 13.88" />
                   </svg>
                 }
-                color="#22c55e"
+                color="color-mix(in srgb, var(--accent) 50%, var(--success))"
               />
             </div>
 
@@ -184,17 +187,31 @@ export function Stats() {
               }}
             >
               <h2 className="text-sm font-semibold mb-4">阅读日历</h2>
-              <div className="flex flex-wrap gap-1.5">
-                {calendarData.map((day) => (
-                  <div
-                    key={day.date}
-                    className="w-3.5 h-3.5 rounded-sm cursor-default transition-transform hover:scale-125"
-                    style={{
-                      background: HEAT_COLORS[day.level],
-                    }}
-                    title={`${day.date}: ${formatDuration(day.duration)}`}
-                  />
-                ))}
+              <div className="overflow-x-auto">
+                <div
+                  className="grid gap-[3px]"
+                  style={{
+                    gridTemplateRows: "repeat(7, 14px)",
+                    gridAutoFlow: "column",
+                    gridAutoColumns: "14px",
+                    width: "max-content",
+                  }}
+                >
+                  {calendarData.map((day) => (
+                    <div
+                      key={day.date}
+                      className="w-3.5 h-3.5 rounded-sm cursor-default transition-transform hover:scale-125"
+                      style={{
+                        background: HEAT_COLORS[day.level],
+                      }}
+                      title={
+                        day.duration > 0
+                          ? `${day.date}: ${formatDuration(day.duration)} · ${formatChars(day.chars)}`
+                          : `${day.date}: 无阅读记录`
+                      }
+                    />
+                  ))}
+                </div>
               </div>
               <div
                 className="flex items-center gap-2 mt-4 text-xs"
@@ -251,7 +268,7 @@ export function Stats() {
                             className="text-xs flex-shrink-0 tabular-nums"
                             style={{ color: "var(--text-tertiary)" }}
                           >
-                            {formatDuration(book.total_duration_ms)}
+                            {formatDuration(book.total_duration_ms)} · {formatChars(book.total_chars_read)}
                           </span>
                         </div>
                       </div>
@@ -301,7 +318,7 @@ function StatCard({
       <div
         className="w-9 h-9 rounded-lg flex items-center justify-center mb-3"
         style={{
-          background: `${color}15`,
+          background: `color-mix(in srgb, ${color} 12%, transparent)`,
           color: color,
         }}
       >
