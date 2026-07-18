@@ -2,7 +2,7 @@
 
 > 本地优先的桌面阅读器 — 翻开一页，沉浸阅读
 
-一款基于 **Tauri 2.0** 的轻量桌面阅读器，支持 TXT、EPUB、PDF、Markdown、DOCX、CBZ、CBR 等格式，提供干净的阅读体验、笔记系统、规则引擎、全文搜索和 WebDAV 同步。
+一款基于 **Tauri 2.0** 的轻量桌面阅读器，支持 TXT、EPUB、PDF、Markdown、DOCX、CBZ、CBR 等格式，提供干净的阅读体验、笔记系统、规则引擎、全文搜索、WebDAV 同步、OPDS 服务和局域网传输。
 
 ---
 
@@ -28,6 +28,11 @@
 - **划线词典查询** — 选中文字即时显示释义（英文支持音标+定义）
 - 笔记导出：Markdown / HTML / JSON（按书籍筛选）
 
+### 书签系统
+- 阅读中一键添加章节级书签（`Ctrl + Shift + B`），自动命名"章节名 · 进度%"
+- 侧边栏书签列表，点击跳转到对应章节与滚动位置
+- 每本书独立书签集合，支持快速删除
+
 ### 全局搜索
 - jieba 中文分词 + SQLite FTS5 全文索引
 - 搜索范围：书库 / 正文 / 笔记
@@ -43,6 +48,17 @@
 - 支持坚果云、Nextcloud、Synology 等标准 WebDAV 服务
 - 增量同步：阅读进度、笔记、标签、规则
 - Push / Pull / Full Sync 三种模式
+- 密码通过 OS keyring 安全存储
+
+### OPDS 服务
+- 内置轻量 HTTP 服务器，输出标准 OPDS 1.2 Atom feed
+- 手机/平板通过 OPDS 客户端（如 Moon+ Reader、静读天下）远程订阅书库
+- 支持书籍下载（`/books/:id`）
+
+### 局域网传输
+- 手机扫码或手动输入地址上传文件到电脑
+- 上传完成后自动导入书库
+- 基于同一 HTTP 服务器，无需额外配置
 
 ### 个性化
 
@@ -66,7 +82,7 @@
 | 后端 | Rust (tokio) |
 | 数据库 | SQLite (rusqlite) + FTS5 |
 | 中文分词 | jieba-rs |
-| 依赖 | epub, pdf, pdf-extract, docx-rs, pulldown-cmark, reqwest, zip, blake3, chardetng |
+| 依赖 | epub, pdf, pdf-extract, docx-rs, pulldown-cmark, reqwest, zip, blake3, chardetng, unrar, pinyin, tiny_http, qrcode |
 
 ---
 
@@ -110,7 +126,8 @@ pnpm tauri build
 │   ├── App.css                   # 全局样式 + 主题变量
 │   ├── constants.ts              # 共享常量
 │   ├── hooks/                    # 共享 hooks
-│   │   └── useFullscreen.ts      # 全屏切换
+│   │   ├── useFullscreen.ts      # 全屏切换
+│   │   └── useReaderKeyboard.ts  # 阅读器键盘快捷键
 │   ├── stores/app.ts             # Zustand 状态管理
 │   ├── components/               # 通用组件
 │   │   ├── BookCard.tsx          # 书籍卡片
@@ -119,15 +136,24 @@ pnpm tauri build
 │   │   └── SearchPanel.tsx       # 搜索面板
 │   ├── pages/                    # 页面
 │   │   ├── Library.tsx           # 书库
-│   │   ├── Reader.tsx            # 小说阅读器
+│   │   ├── Reader.tsx            # 小说阅读器（编排层）
+│   │   ├── reader/               # 阅读器子组件
+│   │   │   ├── ReaderSettings.tsx    # 设置弹窗
+│   │   │   ├── ReaderSidebar.tsx     # 目录+书签
+│   │   │   ├── ReaderStatusBar.tsx   # 状态栏
+│   │   │   ├── ReaderContent.tsx     # 内容渲染
+│   │   │   ├── helpers.tsx           # 共享小组件
+│   │   │   └── constants.ts          # 常量
 │   │   ├── ComicReader.tsx       # 漫画阅读器
 │   │   ├── Stats.tsx             # 阅读统计
 │   │   ├── SyncSettings.tsx      # 同步设置
-│   │   └── Rules.tsx             # 规则引擎管理
+│   │   ├── Rules.tsx             # 规则引擎管理
+│   │   ├── OpdsSettings.tsx      # OPDS 服务配置
+│   │   └── LanTransfer.tsx       # 局域网文件传输
 │   └── types/index.ts            # TypeScript 类型
 ├── src-tauri/                    # Rust 后端
 │   ├── src/
-│   │   ├── lib.rs                # 入口 (52 个 IPC 命令)
+│   │   ├── lib.rs                # 入口 (60+ 个 IPC 命令)
 │   │   ├── main.rs               # Tauri 引导
 │   │   ├── commands/             # Tauri 命令层 (9 个文件)
 │   │   │   ├── books.rs          # 书籍 CRUD
@@ -138,7 +164,8 @@ pnpm tauri build
 │   │   │   ├── search.rs         # 搜索 + 索引
 │   │   │   ├── export.rs         # 导出
 │   │   │   ├── stats.rs          # 统计
-│   │   │   └── sync.rs           # WebDAV 同步
+│   │   │   ├── sync.rs           # WebDAV 同步
+│   │   │   └── opds.rs           # OPDS 服务
 │   │   ├── db/                   # SQLite 数据库 (17 表 + FTS5)
 │   │   ├── parser/               # 格式解析器
 │   │   │   ├── txt.rs            # TXT (编码检测 + 章节切分 + 规则清洗)
@@ -191,9 +218,13 @@ pnpm tauri build
 | 搜索当前书 | `Ctrl + F` |
 | 切换收藏 | `Ctrl + D` |
 | 打开目录跳转 | `Ctrl + G` |
+| 添加书签 | `Ctrl + Shift + B` |
 | 关闭面板 | `Escape` |
 | 全屏 | `F11` |
 | 漫画双页模式 | `D` |
+| 漫画 RTL 翻页 | `R` |
+| 适应宽度 | `W` |
+| 适应高度 | `H` |
 
 ---
 
@@ -206,6 +237,8 @@ pnpm tauri build
 | `/stats` | 阅读统计 | 阅读数据总览 |
 | `/sync` | 同步设置 | WebDAV 配置 |
 | `/rules` | 规则引擎 | 规则管理 + 应用 |
+| `/opds` | OPDS 服务 | OPDS 配置 + 服务器控制 |
+| `/transfer` | 局域网传输 | 手机扫码上传文件 |
 
 ---
 

@@ -10,6 +10,7 @@ FUTURE.md
 TEST_CHECKLIST.md
 STATUS.md
 .ralph/
+.mimocode/
 
 # IDE
 .vscode/
