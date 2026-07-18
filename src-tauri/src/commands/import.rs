@@ -255,6 +255,7 @@ pub async fn import_book(
                 }
 
                 // Update FTS index for book title/author
+                let book_pinyin_title = search::to_pinyin_abbr(&metadata.title);
                 conn.execute(
                     "INSERT INTO books_fts(rowid, title, author, description)
                      SELECT rowid, ?2, ?3, description FROM books WHERE id = ?1",
@@ -263,6 +264,13 @@ pub async fn import_book(
                         search::tokenize(&metadata.title),
                         metadata.author.as_deref().map(|a| search::tokenize(a)).unwrap_or_default(),
                     ],
+                )
+                .map_err(|e| e.to_string())?;
+
+                // Store pinyin for book title search
+                conn.execute(
+                    "UPDATE books SET pinyin_title = ?1 WHERE id = ?2",
+                    params![book_pinyin_title, book_id],
                 )
                 .map_err(|e| e.to_string())?;
 

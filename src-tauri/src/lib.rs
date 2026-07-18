@@ -2,6 +2,7 @@ mod commands;
 mod db;
 mod error;
 mod models;
+mod opds;
 mod parser;
 mod rules;
 mod search;
@@ -18,6 +19,7 @@ pub fn run() {
         .setup(|app| {
             let conn = db::init_db(&app.handle())?;
             app.manage(db::DbConn { conn: std::sync::Arc::new(parking_lot::Mutex::new(conn)) });
+            app.manage(opds::OpdsServerState::new());
 
             // Seed preset rules into DB on first launch
             if let Some(db_state) = app.try_state::<db::DbConn>() {
@@ -58,6 +60,10 @@ pub fn run() {
             commands::annotations::create_annotation,
             commands::annotations::update_annotation,
             commands::annotations::delete_annotation,
+            commands::bookmarks::get_bookmarks,
+            commands::bookmarks::create_bookmark,
+            commands::bookmarks::delete_bookmark,
+            commands::bookmarks::update_bookmark,
             commands::search::search_all,
             commands::export::export_annotations,
             commands::export::get_export_filename,
@@ -83,6 +89,14 @@ pub fn run() {
             commands::sync::sync_pull,
             commands::sync::sync_full,
             commands::sync::get_sync_status,
+            commands::opds::get_opds_config,
+            commands::opds::save_opds_config,
+            commands::opds::get_opds_feed,
+            commands::opds::start_opds_server,
+            commands::opds::stop_opds_server,
+            commands::opds::get_opds_server_status,
+            commands::opds::get_lan_ip,
+            commands::opds::get_upload_page_info,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

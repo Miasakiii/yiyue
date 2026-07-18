@@ -48,9 +48,14 @@ pub fn get_webdav_config(db: State<'_, DbConn>) -> Result<WebDavConfig, String> 
 pub fn save_webdav_config(db: State<'_, DbConn>, config: WebDavConfig) -> Result<(), String> {
     let conn = db.conn.lock();
 
-    // Store password in OS keyring
-    if !config.username.is_empty() && !config.password.is_empty() {
-        crate::sync::store_webdav_password(&config.username, &config.password)?;
+    // Store password in OS keyring. If the password field is empty, treat it
+    // as a deliberate clear and remove any previously stored credential.
+    if !config.username.is_empty() {
+        if !config.password.is_empty() {
+            crate::sync::store_webdav_password(&config.username, &config.password)?;
+        } else {
+            let _ = crate::sync::delete_webdav_password(&config.username);
+        }
     }
 
     // Serialize WITHOUT password (skipped via #[serde(skip)])

@@ -1,8 +1,10 @@
 pub mod annotations;
+pub mod bookmarks;
 pub mod books;
 pub mod dict;
 pub mod export;
 pub mod import;
+pub mod opds;
 pub mod rules;
 pub mod search;
 pub mod stats;

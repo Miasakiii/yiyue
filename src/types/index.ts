@@ -168,3 +168,42 @@ export interface UpdateRule {
   group_id?: string | null;
   description?: string | null;
 }
+
+/* ---------- Bookmarks ---------- */
+
+export interface Bookmark {
+  id: string;
+  book_id: string;
+  chapter_id: string | null;
+  scroll_offset: number;
+  title: string | null;
+  created_at: string;
+}
+
+export interface CreateBookmark {
+  book_id: string;
+  chapter_id?: string | null;
+  scroll_offset?: number;
+  title?: string | null;
+}
+
+// OPDS
+
+export interface OpdsConfig {
+  enabled: boolean;
+  port: number;
+}
+
+export interface OpdsServerStatus {
+  running: boolean;
+  port: number | null;
+  url: string | null;
+  lan_url: string | null;
+}
+
+export interface UploadPageInfo {
+  lan_ip: string | null;
+  port: number;
+  url: string | null;
+  qr_svg: string | null;
+}

@@ -1,4 +1,4 @@
-﻿use crate::commands::search as search_cmd;
+use crate::commands::search as search_cmd;
 use crate::db::DbConn;
 use crate::rules::{self, Rule, RuleGroup};
 use rusqlite::params;
@@ -160,6 +160,7 @@ pub fn update_rule(
     enabled: Option<bool>,
     priority: Option<i64>,
     group_id: Option<String>,
+    clear_group: Option<bool>,
     description: Option<String>,
 ) -> Result<Rule, String> {
     let conn = db.conn.lock();
@@ -193,7 +194,14 @@ pub fn update_rule(
     let is_regex = is_regex.unwrap_or(existing.is_regex);
     let enabled = enabled.unwrap_or(existing.enabled);
     let priority = priority.unwrap_or(existing.priority);
-    let group_id = group_id.or(existing.group_id);
+    // `group_id` alone cannot distinguish "not provided" from "explicit null"
+    // over IPC (both deserialize to None), so the frontend passes
+    // `clear_group: true` when the rule's group should be removed.
+    let group_id = if clear_group.unwrap_or(false) {
+        None
+    } else {
+        group_id.or(existing.group_id)
+    };
     let description = description.or(existing.description);
 
     conn.execute(

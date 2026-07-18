@@ -47,5 +47,6 @@ pub fn init_db(app: &AppHandle) -> DbResult<Connection> {
     let db_path = get_db_path(app)?;
     let conn = Connection::open(&db_path)?;
     schema::initialize(&conn)?;
+    schema::migrate_add_pinyin_columns(&conn)?;
     Ok(conn)
 }

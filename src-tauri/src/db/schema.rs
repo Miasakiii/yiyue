@@ -172,6 +172,17 @@ pub fn initialize(conn: &Connection) -> Result<(), rusqlite::Error> {
             created_at    TEXT NOT NULL DEFAULT (datetime('now')),
             updated_at    TEXT NOT NULL DEFAULT (datetime('now'))
         );
+
+        CREATE TABLE IF NOT EXISTS bookmarks (
+            id            TEXT PRIMARY KEY,
+            book_id       TEXT NOT NULL REFERENCES books(id) ON DELETE CASCADE,
+            chapter_id    TEXT,
+            scroll_offset REAL DEFAULT 0,
+            title         TEXT,
+            created_at    TEXT NOT NULL DEFAULT (datetime('now'))
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_bookmarks_book ON bookmarks(book_id, created_at);
         ",
     )?;
 
@@ -193,6 +204,32 @@ pub fn initialize(conn: &Connection) -> Result<(), rusqlite::Error> {
     )?;
 
     Ok(())
+}
+
+/// Add pinyin search columns to existing tables if they don't exist yet.
+/// This is a lightweight migration for the pinyin search feature.
+pub fn migrate_add_pinyin_columns(conn: &Connection) -> Result<(), rusqlite::Error> {
+    // books.pinyin_title
+    if !column_exists(conn, "books", "pinyin_title")? {
+        conn.execute("ALTER TABLE books ADD COLUMN pinyin_title TEXT", [])?;
+    }
+    // chapters.pinyin_title, chapters.pinyin_content
+    if !column_exists(conn, "chapters", "pinyin_title")? {
+        conn.execute("ALTER TABLE chapters ADD COLUMN pinyin_title TEXT", [])?;
+    }
+    if !column_exists(conn, "chapters", "pinyin_content")? {
+        conn.execute("ALTER TABLE chapters ADD COLUMN pinyin_content TEXT", [])?;
+    }
+    Ok(())
+}
+
+fn column_exists(conn: &Connection, table: &str, column: &str) -> Result<bool, rusqlite::Error> {
+    let mut stmt = conn.prepare(&format!("PRAGMA table_info({})", table))?;
+    let exists = stmt.query_map([], |row| {
+        let name: String = row.get(1)?;
+        Ok(name == column)
+    })?.any(|r| r.unwrap_or(false));
+    Ok(exists)
 }
 
 #[cfg(test)]
