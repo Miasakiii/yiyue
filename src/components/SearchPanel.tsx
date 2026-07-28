@@ -113,12 +113,24 @@ export function SearchPanel({
     await performSearch(query, scope);
   }, [query, scope, performSearch]);
 
-  // Trigger search when external query changes and panel is visible
+  // Trigger search when an external query arrives and the panel is visible.
+  // (Scope changes re-search with the current input value — see below.)
   useEffect(() => {
     if (externalQuery && visible) {
       performSearch(externalQuery, scope);
     }
-  }, [externalQuery, visible, scope, performSearch]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [externalQuery, visible, performSearch]);
+
+  // Re-run the search with the current input value when the scope changes
+  const prevScopeRef = useRef(scope);
+  useEffect(() => {
+    if (prevScopeRef.current === scope) return;
+    prevScopeRef.current = scope;
+    if (visible && query.trim()) {
+      performSearch(query, scope);
+    }
+  }, [scope, visible, query, performSearch]);
 
   // Esc closes the panel regardless of focus; capture phase keeps the event
   // from reaching window-level reader shortcuts that would close panels below.
