@@ -166,6 +166,25 @@ describe("useAppStore", () => {
     });
   });
 
+  describe("saveReadingProfile", () => {
+    it("fires and forgets: does not reload the profile after saving", async () => {
+      const existing = { book_id: "b1", font_size: 18 } as any;
+      useAppStore.setState({ readingProfile: existing });
+      mockInvoke.mockResolvedValueOnce(undefined); // save_reading_profile
+
+      await useAppStore.getState().saveReadingProfile("b1", { font_size: 20 } as any);
+
+      // Only the save call — reloading would re-trigger the Reader apply
+      // effect and yank settings back (the "change one, others jump" loop).
+      expect(mockInvoke).toHaveBeenCalledTimes(1);
+      expect(mockInvoke).toHaveBeenCalledWith("save_reading_profile", {
+        bookId: "b1",
+        profile: { font_size: 20 },
+      });
+      expect(useAppStore.getState().readingProfile).toBe(existing);
+    });
+  });
+
   describe("applyRulesToBook", () => {
     it("should bump contentVersion when rules are applied to the open book", async () => {
       mockInvoke

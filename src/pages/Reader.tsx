@@ -14,7 +14,7 @@ import { ReaderStatusBar } from "./reader/ReaderStatusBar";
 import { ReaderContent } from "./reader/ReaderContent";
 import type { SaveReadingProfile, Bookmark } from "../types";
 
-import { FONT_FAMILIES, CONTENT_WIDTH_PRESETS, type Preset } from "./reader/constants";
+import { FONT_FAMILIES, CONTENT_WIDTH_PRESETS, PRESETS, type Preset } from "./reader/constants";
 
 /* ---------- Component ---------- */
 export function Reader() {
@@ -73,12 +73,14 @@ export function Reader() {
     () => (localStorage.getItem("reader-text-align") as "left" | "justify") || "left"
   );
   const [pageAnimation, setPageAnimation] = useState(
-    () => localStorage.getItem("reader-page-animation") || "none"
+    () => localStorage.getItem("reader-page-animation") || "fade"
   );
   const [animClass, setAnimClass] = useState("");
+  const [chapterToast, setChapterToast] = useState<string | null>(null);
   const prevChapterRef = useRef<string | null>(null);
 
-  // Apply per-book reading profile when it changes (overrides localStorage defaults)
+  // Apply per-book reading profile when it changes (overrides localStorage defaults).
+  // Fires only on load — saveReadingProfile is fire-and-forget by design.
   useEffect(() => {
     if (readingProfile) {
       setFontSize(readingProfile.font_size);
@@ -87,9 +89,24 @@ export function Reader() {
       setContentWidthKey(readingProfile.content_width);
       setParagraphSpacing(readingProfile.paragraph_spacing);
       setTextAlign(readingProfile.text_align as "left" | "justify");
-      if (readingProfile.page_animation && readingProfile.page_animation !== "none") {
+      // "none" (scroll mode) is a valid choice too — apply any persisted value.
+      if (readingProfile.page_animation) {
         setPageAnimation(readingProfile.page_animation);
       }
+      // Keep the preset highlight in sync with the applied values
+      const match = PRESETS.find(
+        (p) =>
+          p.font_size === readingProfile.font_size &&
+          Math.abs(p.line_height - readingProfile.line_height) < 0.01 &&
+          p.font_family === readingProfile.font_family &&
+          p.content_width === readingProfile.content_width &&
+          Math.abs(p.paragraph_spacing - readingProfile.paragraph_spacing) < 0.01 &&
+          p.text_align === readingProfile.text_align &&
+          p.page_animation === readingProfile.page_animation
+      );
+      setActivePreset(match?.key ?? null);
+      if (match) localStorage.setItem("reader-preset", match.key);
+      else localStorage.removeItem("reader-preset");
     }
   }, [readingProfile]);
 
@@ -168,6 +185,9 @@ export function Reader() {
     }
   }, []);
 
+  // Cancel any in-flight speech when the reader unmounts (leaving the book).
+  useEffect(() => () => stopTts(), [stopTts]);
+
   useEffect(() => {
     localStorage.setItem("reader-tts-rate", String(ttsRate));
   }, [ttsRate]);
@@ -220,7 +240,7 @@ export function Reader() {
       saveReadingProfile(currentBook.id, profile);
     }, 500);
     return () => { if (saveTimerRef.current) clearTimeout(saveTimerRef.current); };
-  }, [fontSize, lineHeight, fontFamilyKey, contentWidthKey, paragraphSpacing, textAlign, currentBook]);
+  }, [fontSize, lineHeight, fontFamilyKey, contentWidthKey, paragraphSpacing, textAlign, pageAnimation, currentBook]);
 
   const contentWidth = CONTENT_WIDTH_PRESETS.find((w) => w.key === contentWidthKey)?.value ?? 640;
 
@@ -288,27 +308,44 @@ export function Reader() {
     localStorage.setItem("reader-daily-goal", String(dailyGoal));
   }, [dailyGoal]);
 
-  /* ---- Trigger page animation on chapter change ---- */
+  /* ---- Chapter change feedback: toast badge + page animation ----
+     Deferred until the new chapter's content has finished loading, so the
+     animation/toast play on real content instead of the loading spinner. */
+  const pendingFeedbackRef = useRef<{ chapterId: string; prevId: string } | null>(null);
   useEffect(() => {
-    if (!currentChapter || !prevChapterRef.current || pageAnimation === "none") {
-      prevChapterRef.current = currentChapter?.id ?? null;
-      return;
-    }
-    if (currentChapter.id !== prevChapterRef.current) {
-      // Determine direction: find index of old vs new chapter
-      const oldIdx = chapters.findIndex(c => c.id === prevChapterRef.current);
-      const newIdx = chapters.findIndex(c => c.id === currentChapter.id);
+    const prevId = prevChapterRef.current;
+    prevChapterRef.current = currentChapter?.id ?? null;
+    if (!currentChapter || !prevId || currentChapter.id === prevId) return;
+    pendingFeedbackRef.current = { chapterId: currentChapter.id, prevId };
+  }, [currentChapter]);
+
+  useEffect(() => {
+    if (loading) return;
+    const pending = pendingFeedbackRef.current;
+    if (!pending || !currentChapter || pending.chapterId !== currentChapter.id) return;
+    pendingFeedbackRef.current = null;
+
+    const newIdx = chapters.findIndex((c) => c.id === currentChapter.id);
+    setChapterToast(
+      newIdx >= 0 ? `第 ${newIdx + 1} 章 · ${currentChapter.title}` : currentChapter.title
+    );
+    const toastTimer = setTimeout(() => setChapterToast(null), 1200);
+
+    let animTimer: ReturnType<typeof setTimeout> | undefined;
+    if (pageAnimation !== "none") {
+      const oldIdx = chapters.findIndex((c) => c.id === pending.prevId);
       const direction = newIdx > oldIdx ? "forward" : "backward";
       const cls = pageAnimation === "fade"
         ? "page-anim-fade"
         : direction === "forward" ? "page-anim-slide-left" : "page-anim-slide-right";
       setAnimClass(cls);
-      // Remove animation class after it completes
-      const timer = setTimeout(() => setAnimClass(""), 350);
-      prevChapterRef.current = currentChapter.id;
-      return () => clearTimeout(timer);
+      animTimer = setTimeout(() => setAnimClass(""), 350);
     }
-  }, [currentChapter, pageAnimation, chapters]);
+    return () => {
+      clearTimeout(toastTimer);
+      if (animTimer) clearTimeout(animTimer);
+    };
+  }, [loading, currentChapter, pageAnimation, chapters]);
 
   /* ---- Load chapter content ---- */
   useEffect(() => {
@@ -563,6 +600,21 @@ export function Reader() {
           </div>
         </header>
 
+        {/* Chapter change toast badge */}
+        {chapterToast && (
+          <div className="absolute left-1/2 top-14 -translate-x-1/2 px-3.5 py-1.5 rounded-full text-xs animate-slide-down pointer-events-none"
+            style={{
+              background: "var(--bg-elevated)",
+              color: "var(--text-secondary)",
+              border: "1px solid var(--border)",
+              boxShadow: "var(--shadow-md)",
+              zIndex: "var(--z-popover)",
+              maxWidth: "70%",
+            }}>
+            <span className="truncate block">{chapterToast}</span>
+          </div>
+        )}
+
         {/* Chapter content */}
         <ReaderContent
           content={content}
@@ -583,44 +635,48 @@ export function Reader() {
           chapterId={currentChapter.id}
         />
 
-        {/* Floating chapter navigation - outside scroll container */}
+        {/* Floating chapter navigation — edge hot-zone reveals the button */}
         {chapterIndex > 0 && (
-          <button
-            className="absolute left-2 top-1/2 -translate-y-1/2 w-10 h-20 rounded-lg flex items-center justify-center opacity-30 hover:opacity-100 hover:text-[var(--text-primary)]"
-            style={{
-              background: "var(--bg-elevated)",
-              border: "1px solid var(--border)",
-              boxShadow: "var(--shadow-md)",
-              color: "var(--text-tertiary)",
-              transition: "all var(--transition-fast)",
-              zIndex: "var(--z-popover)",
-            }}
-            onClick={() => loadChapter(chapters[chapterIndex - 1].id)}
-            title="上一章"
+          <div
+            className="absolute left-0 top-1/2 -translate-y-1/2 group pl-1.5 pr-3 py-8"
+            style={{ zIndex: "var(--z-popover)" }}
           >
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M15 18l-6-6 6-6" />
-            </svg>
-          </button>
+            <button
+              className="w-10 h-24 rounded-lg flex items-center justify-center text-[var(--text-secondary)] opacity-60 -translate-x-1 transition-all group-hover:translate-x-0 group-hover:opacity-100 group-hover:text-[var(--accent)]"
+              style={{
+                background: "var(--bg-elevated)",
+                border: "1px solid var(--border)",
+                boxShadow: "var(--shadow-md)",
+              }}
+              onClick={() => loadChapter(chapters[chapterIndex - 1].id)}
+              title="上一章"
+            >
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M15 18l-6-6 6-6" />
+              </svg>
+            </button>
+          </div>
         )}
-        {chapterIndex < chapters.length - 1 && (
-          <button
-            className="absolute right-2 top-1/2 -translate-y-1/2 w-10 h-20 rounded-lg flex items-center justify-center opacity-30 hover:opacity-100 hover:text-[var(--text-primary)]"
-            style={{
-              background: "var(--bg-elevated)",
-              border: "1px solid var(--border)",
-              boxShadow: "var(--shadow-md)",
-              color: "var(--text-tertiary)",
-              transition: "all var(--transition-fast)",
-              zIndex: "var(--z-popover)",
-            }}
-            onClick={() => loadChapter(chapters[chapterIndex + 1].id)}
-            title="下一章"
+        {chapterIndex < chapters.length - 1 && !showNotes && (
+          <div
+            className="absolute right-0 top-1/2 -translate-y-1/2 group pr-1.5 pl-3 py-8"
+            style={{ zIndex: "var(--z-popover)" }}
           >
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M9 18l6-6-6-6" />
-            </svg>
-          </button>
+            <button
+              className="w-10 h-24 rounded-lg flex items-center justify-center text-[var(--text-secondary)] opacity-60 translate-x-1 transition-all group-hover:translate-x-0 group-hover:opacity-100 group-hover:text-[var(--accent)]"
+              style={{
+                background: "var(--bg-elevated)",
+                border: "1px solid var(--border)",
+                boxShadow: "var(--shadow-md)",
+              }}
+              onClick={() => loadChapter(chapters[chapterIndex + 1].id)}
+              title="下一章"
+            >
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M9 18l6-6-6-6" />
+              </svg>
+            </button>
+          </div>
         )}
 
         {/* Status bar */}

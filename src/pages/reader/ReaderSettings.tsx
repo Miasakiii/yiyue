@@ -111,6 +111,20 @@ export function ReaderSettings({
         </div>
       </SettingRow>
 
+      {/* Reading mode (page-turn animation) */}
+      <SettingRow label="阅读方式">
+        <div className="flex gap-1">
+          {[
+            { key: "none", label: "滚动" },
+            { key: "fade", label: "淡入" },
+            { key: "slide", label: "滑动" },
+          ].map((a) => (
+            <ChoiceBtn key={a.key} active={pageAnimation === a.key}
+              onClick={() => { setPageAnimation(a.key); markCustom(); }}>{a.label}</ChoiceBtn>
+          ))}
+        </div>
+      </SettingRow>
+
       {/* Line height */}
       <SettingRow label="行高">
         <div className="flex gap-1">
@@ -158,20 +172,6 @@ export function ReaderSettings({
           {FONT_FAMILIES.map((f) => (
             <ChoiceBtn key={f.key} active={fontFamilyKey === f.key} style={{ fontFamily: f.value }}
               onClick={() => { setFontFamilyKey(f.key); markCustom(); }}>{f.label}</ChoiceBtn>
-          ))}
-        </div>
-      </SettingRow>
-
-      {/* Page animation */}
-      <SettingRow label="翻页">
-        <div className="flex gap-1">
-          {[
-            { key: "none", label: "无" },
-            { key: "fade", label: "淡入" },
-            { key: "slide", label: "滑动" },
-          ].map((a) => (
-            <ChoiceBtn key={a.key} active={pageAnimation === a.key}
-              onClick={() => { setPageAnimation(a.key); markCustom(); }}>{a.label}</ChoiceBtn>
           ))}
         </div>
       </SettingRow>

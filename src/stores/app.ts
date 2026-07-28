@@ -259,11 +259,9 @@ export const useAppStore = create<AppState>((set, get) => ({
   saveReadingProfile: async (bookId: string, profile: SaveReadingProfile) => {
     try {
       await invoke("save_reading_profile", { bookId, profile });
-      // Reload the profile to get the updated state
-      const updated = await invoke<ReadingProfile | null>("get_reading_profile", {
-        bookId,
-      });
-      set({ readingProfile: updated });
+      // Fire-and-forget: do NOT reload readingProfile here. Reloading would
+      // re-trigger the Reader's apply effect and yank every setting back to
+      // the just-saved snapshot — the "change one, others jump" feedback loop.
     } catch (e) {
       console.error("Failed to save reading profile:", e);
     }

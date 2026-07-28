@@ -51,7 +51,7 @@ export function ReaderContent({
             maxWidth: `${contentWidth}px`, textAlign,
             '--reader-paragraph-spacing': `${paragraphSpacing}em`,
           } as React.CSSProperties}>
-          <h2 className="text-2xl font-semibold mb-8 pb-4"
+          <h2 key={currentChapter.id} className="text-2xl font-semibold mb-8 pb-4 animate-slide-down"
             style={{ borderBottom: "1px solid var(--border-light)", color: "var(--text-primary)" }}>
             {currentChapter.title}
           </h2>
