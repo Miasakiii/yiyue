@@ -185,6 +185,33 @@ describe("useAppStore", () => {
     });
   });
 
+  describe("filter state sync", () => {
+    it("setActiveTag stores exactly the tag filter (drops stale keys)", async () => {
+      useAppStore.setState({ filter: { starred: true } as any });
+      mockInvoke.mockResolvedValueOnce([]); // get_books
+
+      useAppStore.getState().setActiveTag("科幻");
+
+      // Stale `starred` must not leak into the tag view, or later no-arg
+      // loadBooks() calls would silently keep the old constraint.
+      expect(useAppStore.getState().filter).toEqual({ tag: "科幻" });
+      expect(useAppStore.getState().activeTag).toBe("科幻");
+      expect(useAppStore.getState().activeGroup).toBeNull();
+      expect(mockInvoke).toHaveBeenCalledWith("get_books", { filter: { tag: "科幻" } });
+    });
+
+    it("setActiveGroup stores exactly the group filter", async () => {
+      useAppStore.setState({ filter: { tag: "旧标签" } as any });
+      mockInvoke.mockResolvedValueOnce([]); // get_books
+
+      useAppStore.getState().setActiveGroup("g1");
+
+      expect(useAppStore.getState().filter).toEqual({ group: "g1" });
+      expect(useAppStore.getState().activeTag).toBeNull();
+      expect(mockInvoke).toHaveBeenCalledWith("get_books", { filter: { group: "g1" } });
+    });
+  });
+
   describe("applyRulesToBook", () => {
     it("should bump contentVersion when rules are applied to the open book", async () => {
       mockInvoke

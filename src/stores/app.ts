@@ -294,7 +294,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       get().loadTags();
       if (tagName && get().activeTag === tagName) {
         set({ activeTag: null });
-        get().loadBooks({ ...get().filter, tag: undefined });
+        get().setFilter({});
       }
     } catch (e) {
       console.error("Failed to delete tag:", e);
@@ -303,7 +303,10 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   setActiveTag: (tag: string | null) => {
     set({ activeTag: tag, activeGroup: null });
-    get().loadBooks({ ...get().filter, tag: tag || undefined, group: undefined });
+    // Filter is exactly the active selection — never merge stale keys
+    // (e.g. `starred` from the favorites view), or later no-arg loadBooks()
+    // calls would silently keep the old constraint.
+    get().setFilter({ tag: tag || undefined });
   },
 
   // Group actions
@@ -331,7 +334,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       get().loadGroups();
       if (get().activeGroup === id) {
         set({ activeGroup: null });
-        get().loadBooks({ ...get().filter, group: undefined });
+        get().setFilter({});
       }
     } catch (e) {
       console.error("Failed to delete group:", e);
@@ -340,7 +343,8 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   setActiveGroup: (groupId: string | null) => {
     set({ activeGroup: groupId, activeTag: null });
-    get().loadBooks({ ...get().filter, group: groupId || undefined, tag: undefined });
+    // See setActiveTag — keep the stored filter exactly in sync.
+    get().setFilter({ group: groupId || undefined });
   },
 
   // Book-Tag/Group actions

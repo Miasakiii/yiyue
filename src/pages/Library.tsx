@@ -266,10 +266,12 @@ export function Library() {
   };
 
   const showStarred = () => {
-    setActiveTag(null);
-    setActiveGroup(null);
     setStarredOnly(true);
-    loadBooks({ starred: true });
+    // Clear active tag/group without triggering their loadBooks side-effects;
+    // setFilter below is the single reload, and it also records the starred
+    // filter in the store so later no-arg loadBooks() calls keep this view.
+    useAppStore.setState({ activeTag: null, activeGroup: null });
+    setFilter({ starred: true });
   };
 
   const selectTag = (name: string | null) => {
@@ -284,9 +286,8 @@ export function Library() {
 
   const clearFilter = () => {
     setStarredOnly(false);
-    setActiveTag(null);
-    setActiveGroup(null);
-    loadBooks({});
+    useAppStore.setState({ activeTag: null, activeGroup: null });
+    setFilter({});
   };
 
   const sortedBooks = [...books].sort((a, b) => {
