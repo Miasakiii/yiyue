@@ -1,9 +1,13 @@
 import { useEffect, useState, useRef, useCallback } from "react";
-import { invoke } from "@tauri-apps/api/core";
+import { invoke, convertFileSrc } from "@tauri-apps/api/core";
 import { useAppStore } from "../stores/app";
 import type { ComicPage } from "../types";
 import { THEMES } from "../constants";
 import { useFullscreen } from "../hooks/useFullscreen";
+
+// Resolve a local image path for the webview. Bare asset:// URLs fail on Windows
+// (wry rewrites them to https://asset.localhost); convertFileSrc handles the encoding.
+const imgSrc = (p?: string) => (p ? convertFileSrc(p) : undefined);
 
 export function ComicReader() {
   const { currentBook, currentChapter, progress, updateProgress, theme, setTheme } = useAppStore();
@@ -399,7 +403,7 @@ export function ComicReader() {
           <div className="h-full overflow-y-auto">
             <div className="max-w-3xl mx-auto">
               {pages.map((page) => (
-                <img key={page.index} src={`asset://localhost/${page.image_path}`} alt={page.file_name}
+                <img key={page.index} src={imgSrc(page.image_path)} alt={page.file_name}
                   className="w-full" style={{ display: "block" }} />
               ))}
             </div>
@@ -408,16 +412,16 @@ export function ComicReader() {
           <div className="flex items-center justify-center h-full gap-1">
             {rtl ? (
               <>
-                <img src={`asset://localhost/${pages[currentPage + 1]?.image_path}`} alt={pages[currentPage + 1]?.file_name}
+                <img src={imgSrc(pages[currentPage + 1]?.image_path)} alt={pages[currentPage + 1]?.file_name}
                   className="max-h-full max-w-[50%] object-contain" style={{ userSelect: "none" }} />
-                <img src={`asset://localhost/${pages[currentPage]?.image_path}`} alt={pages[currentPage]?.file_name}
+                <img src={imgSrc(pages[currentPage]?.image_path)} alt={pages[currentPage]?.file_name}
                   className="max-h-full max-w-[50%] object-contain" style={{ userSelect: "none" }} />
               </>
             ) : (
               <>
-                <img src={`asset://localhost/${pages[currentPage]?.image_path}`} alt={pages[currentPage]?.file_name}
+                <img src={imgSrc(pages[currentPage]?.image_path)} alt={pages[currentPage]?.file_name}
                   className="max-h-full max-w-[50%] object-contain" style={{ userSelect: "none" }} />
-                <img src={`asset://localhost/${pages[currentPage + 1]?.image_path}`} alt={pages[currentPage + 1]?.file_name}
+                <img src={imgSrc(pages[currentPage + 1]?.image_path)} alt={pages[currentPage + 1]?.file_name}
                   className="max-h-full max-w-[50%] object-contain" style={{ userSelect: "none" }} />
               </>
             )}
@@ -439,7 +443,7 @@ export function ComicReader() {
               transition: isDragging ? "none" : "transform 150ms ease-out",
               transformOrigin: "center center",
             }}>
-              <img ref={imgElRef} src={`asset://localhost/${pages[currentPage]?.image_path}`} alt={pages[currentPage]?.file_name}
+              <img ref={imgElRef} src={imgSrc(pages[currentPage]?.image_path)} alt={pages[currentPage]?.file_name}
                 className="max-w-full max-h-full object-contain" style={{ userSelect: "none", pointerEvents: "none" }} />
             </div>
           </div>

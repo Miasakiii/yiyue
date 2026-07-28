@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from "react";
+import { convertFileSrc } from "@tauri-apps/api/core";
 import { useAppStore } from "../stores/app";
 import type { BookListItem, Tag, Group } from "../types";
 
@@ -49,6 +50,8 @@ export function BookCard({ book, viewMode }: BookCardProps) {
   const [bookGroups, setBookGroups] = useState<Group[]>([]);
   const [ctxTab, setCtxTab] = useState<"tags" | "groups">("tags");
   const ctxRef = useRef<HTMLDivElement>(null);
+  // Cover falls back to the format badge if the file can't be loaded
+  const [coverError, setCoverError] = useState(false);
 
   const loadBookAssociations = useCallback(async () => {
     const [bt, bg] = await Promise.all([
@@ -234,11 +237,12 @@ export function BookCard({ book, viewMode }: BookCardProps) {
           className="aspect-[3/4] flex items-center justify-center relative overflow-hidden"
           style={{ background: `linear-gradient(145deg, ${formatColor}15, ${formatColor}08)` }}
         >
-          {book.cover_path ? (
+          {book.cover_path && !coverError ? (
             <img
-              src={book.cover_path}
+              src={convertFileSrc(book.cover_path)}
               alt={book.title}
               loading="lazy"
+              onError={() => setCoverError(true)}
               className="w-full h-full object-cover"
               style={{ background: "var(--bg-tertiary)" }}
             />
