@@ -76,11 +76,14 @@ export function Stats() {
 
     const start = new Date(today);
     start.setDate(start.getDate() - 89);
-    // Shift back to the Monday of that week (getUTCDay: 0=Sun..6=Sat).
-    start.setDate(start.getDate() - ((start.getUTCDay() + 6) % 7));
+    // Shift back to the Monday of that week (getDay: 0=Sun..6=Sat). Local-time
+    // accessors are used throughout so each cell matches the user's calendar
+    // day — getUTCDay/toISOString would shift UTC+8 early-morning reading
+    // into the previous day's cell.
+    start.setDate(start.getDate() - ((start.getDay() + 6) % 7));
 
     for (const d = new Date(start); d <= today; d.setDate(d.getDate() + 1)) {
-      const dateStr = d.toISOString().split("T")[0];
+      const dateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
       const entry = statsMap.get(dateStr);
       const duration = entry?.duration_ms || 0;
       const chars = entry?.chars_read || 0;
