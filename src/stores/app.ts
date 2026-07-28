@@ -283,6 +283,8 @@ export const useAppStore = create<AppState>((set, get) => ({
       get().loadTags();
     } catch (e) {
       console.error("Failed to create tag:", e);
+      showToast("创建标签失败", "error");
+      throw e;
     }
   },
 
@@ -325,6 +327,8 @@ export const useAppStore = create<AppState>((set, get) => ({
       get().loadGroups();
     } catch (e) {
       console.error("Failed to create group:", e);
+      showToast("创建分组失败", "error");
+      throw e;
     }
   },
 
@@ -514,7 +518,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     } catch (e) {
       console.error("Failed to apply rules to book:", e);
       showToast("应用规则失败", "error");
-      return 0;
+      throw e;
     }
   },
 

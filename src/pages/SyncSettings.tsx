@@ -58,6 +58,7 @@ export function SyncSettings() {
       setTimeout(() => setSyncMessage(""), 3000);
     } catch (e) {
       console.error("Failed to save config:", e);
+      setSyncMessage(`保存失败: ${e}`);
     }
   };
 

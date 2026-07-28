@@ -242,17 +242,25 @@ export function Library() {
 
   const handleCreateTag = async () => {
     if (!newTagName.trim()) return;
-    await createTag(newTagName.trim(), newTagColor);
-    setNewTagName("");
-    setNewTagColor(TAG_COLORS[0]);
-    setShowTagDialog(false);
+    try {
+      await createTag(newTagName.trim(), newTagColor);
+      setNewTagName("");
+      setNewTagColor(TAG_COLORS[0]);
+      setShowTagDialog(false);
+    } catch {
+      // Store already showed an error toast; keep the dialog open.
+    }
   };
 
   const handleCreateGroup = async () => {
     if (!newGroupName.trim()) return;
-    await createGroup(newGroupName.trim());
-    setNewGroupName("");
-    setShowGroupDialog(false);
+    try {
+      await createGroup(newGroupName.trim());
+      setNewGroupName("");
+      setShowGroupDialog(false);
+    } catch {
+      // Store already showed an error toast; keep the dialog open.
+    }
   };
 
   const handleConfirmDelete = async () => {

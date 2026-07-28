@@ -106,8 +106,13 @@ export function Rules() {
   const handleApplyToBook = async () => {
     if (!applyBookId.trim()) return;
     setApplyMsg("应用规则中...");
-    const count = await applyRulesToBook(applyBookId.trim());
-    setApplyMsg(`应用完成，共替换 ${count} 处`);
+    try {
+      // The store throws on failure (older implementations returned null).
+      const count = await applyRulesToBook(applyBookId.trim());
+      setApplyMsg(count == null ? "应用失败，请重试" : `应用完成，共替换 ${count} 处`);
+    } catch {
+      setApplyMsg("应用失败，请重试");
+    }
     setTimeout(() => setApplyMsg(""), 3000);
   };
 
@@ -238,7 +243,13 @@ export function Rules() {
                 {applyMsg && (
                   <span
                     className="text-xs"
-                    style={{ color: applyMsg.includes("完成") ? "var(--success)" : "var(--text-tertiary)" }}
+                    style={{
+                      color: applyMsg.includes("失败")
+                        ? "var(--error)"
+                        : applyMsg.includes("完成")
+                          ? "var(--success)"
+                          : "var(--text-tertiary)",
+                    }}
                   >
                     {applyMsg}
                   </span>
