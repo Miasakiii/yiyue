@@ -10,6 +10,7 @@ import { Rules } from "./pages/Rules";
 import { OpdsSettings } from "./pages/OpdsSettings";
 import { LanTransfer } from "./pages/LanTransfer";
 import { SearchPanel } from "./components/SearchPanel";
+import { TitleBar } from "./components/TitleBar";
 import { ToastContainer } from "./components/Toast";
 import "./App.css";
 
@@ -78,33 +79,36 @@ function App() {
   const isComic = currentBook?.kind === "comic";
 
   return (
-    <>
-      <Routes>
-        <Route path="/" element={<Library />} />
-        <Route path="/stats" element={<Stats />} />
-        <Route path="/sync" element={<SyncSettings />} />
-        <Route path="/rules" element={<Rules />} />
-        <Route path="/opds" element={<OpdsSettings />} />
-        <Route path="/transfer" element={<LanTransfer />} />
-        <Route
-          path="/reader"
-          element={
-            currentBook ? (
-              isComic ? <ComicReader /> : <Reader />
-            ) : (
-              <Navigate to="/" replace />
-            )
-          }
+    <div className="flex flex-col h-screen overflow-hidden">
+      <TitleBar />
+      <div className="flex-1 min-h-0 relative">
+        <Routes>
+          <Route path="/" element={<Library />} />
+          <Route path="/stats" element={<Stats />} />
+          <Route path="/sync" element={<SyncSettings />} />
+          <Route path="/rules" element={<Rules />} />
+          <Route path="/opds" element={<OpdsSettings />} />
+          <Route path="/transfer" element={<LanTransfer />} />
+          <Route
+            path="/reader"
+            element={
+              currentBook ? (
+                isComic ? <ComicReader /> : <Reader />
+              ) : (
+                <Navigate to="/" replace />
+              )
+            }
+          />
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+        <SearchPanel
+          visible={showSearch}
+          onClose={() => { setShowSearch(false); setSearchQuery(""); }}
+          query={searchQuery}
         />
-        <Route path="*" element={<Navigate to="/" replace />} />
-      </Routes>
-      <SearchPanel
-        visible={showSearch}
-        onClose={() => { setShowSearch(false); setSearchQuery(""); }}
-        query={searchQuery}
-      />
-      <ToastContainer />
-    </>
+        <ToastContainer />
+      </div>
+    </div>
   );
 }
 

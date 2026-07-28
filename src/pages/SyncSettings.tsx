@@ -94,7 +94,7 @@ export function SyncSettings() {
 
   return (
     <div
-      className="flex flex-col h-screen"
+      className="flex flex-col h-full"
       style={{ background: "var(--bg-primary)", color: "var(--text-primary)" }}
     >
       <PageHeader title="同步设置" />

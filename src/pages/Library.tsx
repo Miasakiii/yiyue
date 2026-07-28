@@ -306,7 +306,7 @@ export function Library() {
   const hasActiveFilter = activeTag !== null || activeGroup !== null || starredOnly;
 
   return (
-    <div className="flex h-screen relative" style={{ background: "var(--bg-primary)", color: "var(--text-primary)" }}>
+    <div className="flex h-full relative" style={{ background: "var(--bg-primary)", color: "var(--text-primary)" }}>
       {/* Drag overlay */}
       {isDragging && (
         <div

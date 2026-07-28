@@ -69,7 +69,7 @@ export function LanTransfer() {
   const uploadUrl = pageInfo?.url || null;
 
   return (
-    <div className="flex flex-col h-screen" style={{ background: "var(--bg-primary)", color: "var(--text-primary)" }}>
+    <div className="flex flex-col h-full" style={{ background: "var(--bg-primary)", color: "var(--text-primary)" }}>
       <PageHeader title="局域网传输" />
 
       <main className="flex-1 overflow-y-auto p-8">

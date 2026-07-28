@@ -125,7 +125,7 @@ export function Rules() {
   };
 
   return (
-    <div className="flex h-screen" style={{ background: "var(--bg-primary)", color: "var(--text-primary)" }}>
+    <div className="flex h-full" style={{ background: "var(--bg-primary)", color: "var(--text-primary)" }}>
       {/* Sidebar */}
       <aside
         className="flex-shrink-0 flex flex-col overflow-hidden"

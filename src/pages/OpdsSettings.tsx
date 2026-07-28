@@ -66,7 +66,7 @@ export function OpdsSettings() {
   if (loading) {
     return (
       <div
-        className="flex flex-col h-screen"
+        className="flex flex-col h-full"
         style={{ background: "var(--bg-primary)", color: "var(--text-primary)" }}
       >
         <PageHeader title="OPDS 服务" />
@@ -86,7 +86,7 @@ export function OpdsSettings() {
   }
 
   return (
-    <div className="flex flex-col h-screen" style={{ background: "var(--bg-primary)", color: "var(--text-primary)" }}>
+    <div className="flex flex-col h-full" style={{ background: "var(--bg-primary)", color: "var(--text-primary)" }}>
       <PageHeader title="OPDS 服务" />
 
       {/* Content */}
