@@ -73,6 +73,16 @@ export function SearchPanel({
     }
   }, [visible]);
 
+  // Contract with useReaderKeyboard / HighlightPopover: while the search
+  // panel is open it owns the keyboard, so underlying shortcuts stay quiet.
+  useEffect(() => {
+    if (!visible) return;
+    document.body.dataset.modalOpen = "true";
+    return () => {
+      delete document.body.dataset.modalOpen;
+    };
+  }, [visible]);
+
   // Sync external query prop to internal state and trigger search
   useEffect(() => {
     if (!externalQuery) return;
@@ -110,13 +120,25 @@ export function SearchPanel({
     }
   }, [externalQuery, visible, scope, performSearch]);
 
+  // Esc closes the panel regardless of focus; capture phase keeps the event
+  // from reaching window-level reader shortcuts that would close panels below.
+  useEffect(() => {
+    if (!visible) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        e.stopPropagation();
+        e.preventDefault();
+        onClose();
+      }
+    };
+    document.addEventListener("keydown", onKeyDown, true);
+    return () => document.removeEventListener("keydown", onKeyDown, true);
+  }, [visible, onClose]);
+
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter") {
       e.preventDefault();
       handleSearch();
-    } else if (e.key === "Escape") {
-      e.stopPropagation(); // keep reader-level keyboard hooks from also consuming it
-      onClose();
     }
   };
 

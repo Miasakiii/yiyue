@@ -30,14 +30,22 @@ export function useReaderKeyboard({
       // Ignore shortcuts while typing in inputs/textareas/selects (e.g. note
       // editor, goal input, search box) so arrows/PageUp/PageDown don't flip chapters.
       if ((e.target as HTMLElement | null)?.closest?.("input, textarea, select, [contenteditable]")) return;
+      // A modal overlay (e.g. global search) owns the keyboard while open.
+      if (document.body.dataset.modalOpen === "true") return;
       if (!currentChapter) return;
       const chapterIndex = chapters.findIndex((c) => c.id === currentChapter.id);
       if (e.key === "ArrowRight" || e.key === "PageDown") {
-        e.preventDefault();
-        if (chapterIndex < chapters.length - 1) loadChapter(chapters[chapterIndex + 1].id);
+        // Only swallow the key when it actually turns a page — at the
+        // boundary let it fall through instead of being a dead key.
+        if (chapterIndex < chapters.length - 1) {
+          e.preventDefault();
+          loadChapter(chapters[chapterIndex + 1].id);
+        }
       } else if (e.key === "ArrowLeft" || e.key === "PageUp") {
-        e.preventDefault();
-        if (chapterIndex > 0) loadChapter(chapters[chapterIndex - 1].id);
+        if (chapterIndex > 0) {
+          e.preventDefault();
+          loadChapter(chapters[chapterIndex - 1].id);
+        }
       } else if (e.key === "=" && (e.ctrlKey || e.metaKey)) {
         e.preventDefault();
         setFontSize((s) => Math.min(s + 2, 36));

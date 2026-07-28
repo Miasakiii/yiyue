@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi, afterEach } from "vitest";
 import { render, renderHook, fireEvent } from "@testing-library/react";
 import { useReaderKeyboard } from "../useReaderKeyboard";
 import type { Chapter } from "../../types";
@@ -37,6 +37,10 @@ function setup(currentChapter: Chapter = chapters[0]) {
 }
 
 describe("useReaderKeyboard input guard", () => {
+  afterEach(() => {
+    delete document.body.dataset.modalOpen;
+  });
+
   it("ignores arrow keys pressed inside <input>", () => {
     const { loadChapter } = setup();
     const { getByTestId } = render(<input data-testid="field" />);
@@ -81,5 +85,30 @@ describe("useReaderKeyboard input guard", () => {
     fireEvent.keyDown(document.body, { key: "ArrowRight" });
 
     expect(loadChapter).not.toHaveBeenCalled();
+  });
+
+  it("ignores navigation keys while a modal overlay owns the keyboard", () => {
+    const { loadChapter } = setup();
+    document.body.dataset.modalOpen = "true";
+
+    fireEvent.keyDown(document.body, { key: "ArrowRight" });
+    fireEvent.keyDown(document.body, { key: "PageDown" });
+
+    expect(loadChapter).not.toHaveBeenCalled();
+  });
+
+  it("consumes the key when a page actually turns, but lets it fall through at the boundary", () => {
+    // Middle chapter: navigation happens, default is prevented
+    const { loadChapter } = setup(chapters[1]);
+    const consumed = !fireEvent.keyDown(document.body, { key: "ArrowRight" });
+    expect(consumed).toBe(true);
+    expect(loadChapter).toHaveBeenCalledWith("ch3");
+  });
+
+  it("does not preventDefault on ArrowRight at the last chapter (dead-key passthrough)", () => {
+    setup(chapters[2]);
+    // fireEvent returns false only when preventDefault was called
+    const notPrevented = fireEvent.keyDown(document.body, { key: "ArrowRight" });
+    expect(notPrevented).toBe(true);
   });
 });

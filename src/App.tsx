@@ -36,7 +36,7 @@ function App() {
   // Global keyboard shortcut: Ctrl+Shift+F for search
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "f" && (e.ctrlKey || e.metaKey) && e.shiftKey) {
+      if (e.key.toLowerCase() === "f" && (e.ctrlKey || e.metaKey) && e.shiftKey) {
         e.preventDefault();
         setShowSearch((s) => !s);
       }

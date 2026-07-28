@@ -82,6 +82,10 @@ export function HighlightPopover({
     const handleKeyDown = (e: KeyboardEvent) => {
       if (!visible) return;
       if (showNoteInput) return;
+      // Don't steal number keys while typing in an input, or while a modal
+      // overlay (e.g. global search) owns the keyboard.
+      if ((e.target as HTMLElement | null)?.closest?.("input, textarea, select, [contenteditable]")) return;
+      if (document.body.dataset.modalOpen === "true") return;
 
       const colorEntry = HIGHLIGHT_COLORS.find((c) => c.key === e.key);
       if (colorEntry) {
