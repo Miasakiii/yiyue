@@ -9,6 +9,9 @@ export function OpdsSettings() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  // Port is edited as free text so the field can be cleared; it is parsed
+  // and validated on blur / save, falling back to 8080.
+  const [portInput, setPortInput] = useState("8080");
 
   useEffect(() => {
     loadConfig();
@@ -21,8 +24,9 @@ export function OpdsSettings() {
         invoke<OpdsServerStatus>("get_opds_server_status"),
       ]);
       setConfig(c);
+      setPortInput(String(c.port));
       setStatus(s);
-    } catch (e) {
+    } catch {
       setError("加载配置失败");
     } finally {
       setLoading(false);
@@ -34,15 +38,30 @@ export function OpdsSettings() {
     setStatus(s);
   };
 
+  const parsePort = (): number => {
+    const p = parseInt(portInput, 10);
+    return Number.isNaN(p) || p < 1 || p > 65535 ? 8080 : p;
+  };
+
+  const commitPort = () => {
+    const port = parsePort();
+    setPortInput(String(port));
+    setConfig((c) => ({ ...c, port }));
+  };
+
   const handleSave = async () => {
     setSaving(true);
     setError("");
     try {
-      await invoke("save_opds_config", { config });
+      const port = parsePort();
+      setPortInput(String(port));
+      const nextConfig = { ...config, port };
+      setConfig(nextConfig);
+      await invoke("save_opds_config", { config: nextConfig });
       // Saving does not stop the server — re-fetch the real status instead of
       // assuming it went down.
       await refreshStatus();
-    } catch (e) {
+    } catch {
       setError("保存配置失败");
     } finally {
       setSaving(false);
@@ -58,7 +77,7 @@ export function OpdsSettings() {
         await invoke("start_opds_server", { port: config.port });
       }
       await refreshStatus();
-    } catch (e) {
+    } catch {
       setError("操作失败");
     }
   };
@@ -159,8 +178,9 @@ export function OpdsSettings() {
                 <div className="w-32">
                   <Input
                     type="number"
-                    value={config.port}
-                    onChange={(e) => setConfig({ ...config, port: parseInt(e.target.value) || 8080 })}
+                    value={portInput}
+                    onChange={(e) => setPortInput(e.target.value)}
+                    onBlur={commitPort}
                   />
                 </div>
               </div>
