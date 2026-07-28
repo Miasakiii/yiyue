@@ -5,6 +5,10 @@ import type { ComicPage } from "../types";
 import { THEMES } from "../constants";
 import { useFullscreen } from "../hooks/useFullscreen";
 
+// Single-page zoom bounds — shared by wheel, buttons and fit calculations.
+const ZOOM_MIN = 0.1;
+const ZOOM_MAX = 5.0;
+
 // Resolve a local image path for the webview. Bare asset:// URLs fail on Windows
 // (wry rewrites them to https://asset.localhost); convertFileSrc handles the encoding.
 const imgSrc = (p?: string) => (p ? convertFileSrc(p) : undefined);
@@ -30,6 +34,8 @@ export function ComicReader() {
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
   const containerRef = useRef<HTMLDivElement>(null);
   const imgElRef = useRef<HTMLImageElement>(null);
+  // currentBook may be null while hooks run (see the early return below).
+  const isWebtoon = currentBook?.reading_mode === "webtoon";
 
   // Persist zoom
   useEffect(() => {
@@ -106,12 +112,15 @@ export function ComicReader() {
 
   /* ---- Zoom & Pan ---- */
   const handleWheel = useCallback((e: WheelEvent) => {
+    // Zoom only applies to single-page mode; in webtoon/double-page mode it
+    // would be visually inert yet still persisted to localStorage.
+    if (isWebtoon || doublePage) return;
     if (e.ctrlKey || e.metaKey) {
       e.preventDefault();
       const delta = e.deltaY > 0 ? -0.1 : 0.1;
-      setZoom((z) => Math.min(3.0, Math.max(0.5, z + delta)));
+      setZoom((z) => Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, z + delta)));
     }
-  }, []);
+  }, [isWebtoon, doublePage]);
 
   // Keep at least `margin` px of the image inside the viewport while panning
   const clampPan = useCallback((x: number, y: number) => {
@@ -157,7 +166,7 @@ export function ComicReader() {
     const target = mode === "width"
       ? container.clientWidth / baseW
       : container.clientHeight / baseH;
-    setZoom(Math.min(5.0, Math.max(0.1, target)));
+    setZoom(Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, target)));
     setPan({ x: 0, y: 0 });
   }, [zoom]);
 
@@ -182,6 +191,9 @@ export function ComicReader() {
     const handleKeyDown = (e: KeyboardEvent) => {
       const target = e.target as HTMLElement | null;
       if (target?.closest?.("input, textarea, select, [contenteditable]")) return;
+      if (document.body.dataset.modalOpen === "true") return;
+      // Zoom shortcuts only make sense in single-page mode.
+      if (isWebtoon || doublePage) return;
       if (e.key === "w" || e.key === "W") fitWidth();
       if (e.key === "h" || e.key === "H") fitHeight();
       if (e.key === "0" && (e.ctrlKey || e.metaKey)) {
@@ -191,12 +203,15 @@ export function ComicReader() {
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [fitWidth, fitHeight, resetZoom]);
+  }, [fitWidth, fitHeight, resetZoom, isWebtoon, doublePage]);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       const target = e.target as HTMLElement | null;
       if (target?.closest?.("input, textarea, select, [contenteditable]")) return;
+      if (document.body.dataset.modalOpen === "true") return;
+      // Webtoon mode scrolls natively — leave all navigation keys alone.
+      if (isWebtoon) return;
       if (e.key === "ArrowRight" || e.key === "PageDown" || e.key === " ") {
         e.preventDefault();
         rtlNext();
@@ -222,13 +237,16 @@ export function ComicReader() {
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [rtlNext, rtlPrev, goToPage, pages.length, toggleFullscreen]);
+  }, [rtlNext, rtlPrev, goToPage, pages.length, toggleFullscreen, isWebtoon]);
 
   useEffect(() => {
     const container = containerRef.current;
     if (!container) return;
     let wheelTimeout: ReturnType<typeof setTimeout> | null = null;
     const handleWheel = (e: WheelEvent) => {
+      // Webtoon mode scrolls natively — do not hijack the wheel (paging here
+      // would also corrupt reading progress via rtlNext/rtlPrev).
+      if (isWebtoon) return;
       if (e.ctrlKey || e.metaKey) return; // Ctrl+wheel is handled by the zoom listener
       e.preventDefault();
       if (wheelTimeout) return;
@@ -238,7 +256,7 @@ export function ComicReader() {
     };
     container.addEventListener("wheel", handleWheel, { passive: false });
     return () => container.removeEventListener("wheel", handleWheel);
-  }, [rtlNext, rtlPrev]);
+  }, [rtlNext, rtlPrev, isWebtoon]);
 
   const { closeBook } = useAppStore.getState();
   const goBack = () => {
@@ -248,7 +266,7 @@ export function ComicReader() {
 
   if (!currentBook || !currentChapter) {
     return (
-      <div className="flex items-center justify-center h-screen" style={{ background: "var(--bg-primary)" }}>
+      <div className="flex items-center justify-center h-full" style={{ background: "var(--bg-primary)" }}>
         <div className="flex flex-col items-center gap-3">
           <div className="w-8 h-8 rounded-full border-2 border-t-transparent animate-spin" style={{ borderColor: "var(--accent)", borderTopColor: "transparent" }} />
           <div className="text-sm" style={{ color: "var(--text-tertiary)" }}>加载中...</div>
@@ -257,11 +275,10 @@ export function ComicReader() {
     );
   }
 
-  const isWebtoon = currentBook.reading_mode === "webtoon";
   const progressPct = pages.length > 0 ? Math.round(((currentPage + 1) / pages.length) * 100) : 0;
 
   return (
-    <div className="flex flex-col h-screen" style={{ background: "var(--bg-primary)", color: "var(--text-primary)" }}>
+    <div className="flex flex-col h-full" style={{ background: "var(--bg-primary)", color: "var(--text-primary)" }}>
       {/* Toolbar */}
       <header className="flex items-center justify-between px-5 py-2.5 flex-shrink-0"
         style={{ borderBottom: "1px solid var(--border)", background: "var(--bg-elevated)" }}>
@@ -330,7 +347,7 @@ export function ComicReader() {
             <>
               <button className="px-2 py-1.5 rounded-lg text-xs hover-bg"
                 style={{ color: "var(--text-tertiary)" }}
-                onClick={() => setZoom((z) => Math.min(3.0, z + 0.2))}
+                onClick={() => setZoom((z) => Math.min(ZOOM_MAX, z + 0.2))}
                 title="放大 (Ctrl+滚轮)">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                   <circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" /><line x1="11" y1="8" x2="11" y2="14" /><line x1="8" y1="11" x2="14" y2="11" />
@@ -341,7 +358,7 @@ export function ComicReader() {
               </span>
               <button className="px-2 py-1.5 rounded-lg text-xs hover-bg"
                 style={{ color: "var(--text-tertiary)" }}
-                onClick={() => setZoom((z) => Math.max(0.5, z - 0.2))}
+                onClick={() => setZoom((z) => Math.max(ZOOM_MIN, z - 0.2))}
                 title="缩小">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                   <circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" /><line x1="8" y1="11" x2="14" y2="11" />
@@ -436,6 +453,7 @@ export function ComicReader() {
             onMouseDown={handleMouseDown}
             onMouseMove={handleMouseMove}
             onMouseUp={handleMouseUp}
+            // eslint-disable-next-line no-restricted-syntax -- 非 hover 样式：鼠标移出时结束拖拽平移
             onMouseLeave={handleMouseUp}
           >
             <div style={{
