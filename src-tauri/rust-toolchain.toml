@@ -1,0 +1,6 @@
+# 钉住 Rust 工具链版本，保证跨机构建一致（rustup 进入本目录自动切换/安装）
+# minimal profile 跳过 rust-docs 等大体积组件，加快全新环境安装
+[toolchain]
+channel = "1.95.0"
+profile = "minimal"
+components = ["clippy", "rustfmt"]

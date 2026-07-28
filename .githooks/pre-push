@@ -1,0 +1,5 @@
+#!/bin/sh
+# 最小验收门禁（pre-push）：按待推送范围运行前后端检查，任一失败即阻断推送。
+# 激活方式：pnpm hooks:install（将本文件复制到 .git/hooks/pre-push）
+# 紧急跳过：git push --no-verify（不推荐）
+exec node "$(git rev-parse --show-toplevel)/scripts/gate.mjs" --pre-push

@@ -10,21 +10,26 @@ Tauri 2.0 桌面阅读器。前端 React 19 + TypeScript + Vite 7，后端 Rust 
 |---|---|---|
 | 前端开发服务器 | `pnpm dev` | 仅启动 Vite（端口 1420），**不启动 Tauri** |
 | 完整开发环境 | `pnpm tauri dev` | Tauri 会先自动执行 `pnpm dev`，再打开桌面窗口 |
-| 前端类型检查 | `npx tsc --noEmit` | 必须在 `src/` 目录执行，比 `pnpm build` 快 |
+| 前端类型检查 | `npx tsc --noEmit` | 在仓库根目录执行（与 `scripts/gate.mjs` 一致），比 `pnpm build` 快 |
 | 前端构建 | `pnpm build` | 执行 `tsc && vite build`，输出到 `dist/` |
 | Tauri 桌面打包 | `pnpm tauri build` | 需要先完成 `pnpm build`，生成 Windows 安装包 |
-| 测试 | `pnpm test` | vitest run；21/21 通过（4 个测试文件） |
+| 测试 | `pnpm test` | vitest run，在仓库根目录执行；通过数以实际运行为准（历史快照见 `STATUS.md`） |
 | Rust 编译检查 | `cargo check` | 在 `src-tauri/` 执行 |
-| Rust 测试 | `cargo test` | 在 `src-tauri/` 执行，29 个测试 |
+| Rust 测试 | `cargo test` | 在 `src-tauri/` 目录执行；通过数以实际运行为准（历史快照见 `STATUS.md`） |
+| 一键门禁 | `pnpm gate` | 按变更区域自动运行上述检查（`node scripts/gate.mjs --all` 强制全量） |
+| 安装门禁钩子 | `pnpm hooks:install` | 将 `.githooks/pre-push` 复制到 `.git/hooks/`，推送前自动跑门禁（`git push --no-verify` 可紧急跳过） |
+
+CI 门禁：`.github/workflows/ci.yml` 在 push/PR 时按变更区域运行前端（tsc + vitest）与后端（cargo check + test）检查，任一失败即 `gate` 汇总作业阻断。
 
 ## 关键约束
 
 - **IPC 命令必须成对注册**：新增 Rust 命令后，需同时在 `src-tauri/src/lib.rs` 的 `generate_handler![...]` 中注册，并在 `src-tauri/src/commands/mod.rs` 声明 `pub mod`。漏注册会导致前端 `invoke` 静默失败。
 - **CSP 已收紧**：`tauri.conf.json` 中 `style-src` 仅允许 `'self' 'unsafe-inline'`，新增外部 CSS 资源会破坏 CSP。
+- **安全基线守护**：`security-baseline.json` 固化了权限清单（`capabilities/default.json`）与 CSP/asset 协议快照，`src/__tests__/security-baseline.test.ts` 在 `pnpm test` 中比对。任何扩权需显式更新基线并在提交说明中记录理由。
 - **HTML sanitize**：`Reader.tsx` 对 Markdown 内容使用 `DOMPurify.sanitize()`。`SearchPanel.tsx` 已改用 `DOMPurify.sanitize(html, { ALLOWED_TAGS: ['mark'] })` 清洗搜索摘要。
 - **WebDAV 密码已迁入系统凭据**：`settings` 表中不再明文存储密码，改用 `keyring` crate 存入 OS 凭据管理器。修改同步模块时不得在日志或前端代码中暴露密码。
 - **`get_book_groups` 已被前端调用**：`BookCard.tsx` 通过 `stores/app.ts` 的 `getBookGroups` action 展示/设置书籍分组。
-- **thiserror 迁移中**：`error.rs` 已定义 `AppError` 枚举，OPDS 模块率先迁移。新增 Rust 模块时优先使用 `AppResult<T>`，避免继续扩散 `Result<T, String>`。
+- **thiserror 迁移中（棘轮守护）**：`error.rs` 已定义 `AppError` 枚举，OPDS 模块率先迁移。新增 Rust 模块时优先使用 `AppResult<T>`，避免继续扩散 `Result<T, String>`。`src-tauri/tests/error_ratchet.rs` 会统计 `src/` 中旧式 `Result<T, String>` 数量并与 `tests/error_ratchet_baseline.json` 基线比对：数量上升即 `cargo test` 失败；完成一批迁移后运行 `UPDATE_ERROR_RATCHET=1 cargo test --test error_ratchet` 下调基线。
 - **Reader.tsx 已拆分**：原 1138 行拆分为 `reader/` 子组件（ReaderSettings、ReaderSidebar、ReaderStatusBar、ReaderContent、helpers、constants）+ `hooks/useReaderKeyboard.ts`。Reader.tsx 现为 ~670 行编排层。修改阅读器功能时需注意组件边界。
 
 ## 架构要点
@@ -109,18 +114,19 @@ Tauri 2.0 桌面阅读器。前端 React 19 + TypeScript + Vite 7，后端 Rust 
 
 ### P3 — 质量工程
 - [x] 建立最小回归测试集（`src/__tests__/regression.test.ts`）
-- [x] 修复 vitest 环境（`CI=true pnpm install`），14/14 通过
+- [x] 修复 vitest 环境（rollup 原生依赖问题已根治，普通 `pnpm install` 即可），验证方式：仓库根目录运行 `pnpm test`
 - [x] Reader.tsx 拆分（1138 行 → 673 行，7 个子组件 + 1 个 hook）
-- [ ] 统一错误处理为 `thiserror` 结构化类型（OPDS 已完成示范，继续推进其他模块）
+- [ ] 统一错误处理为 `thiserror` 结构化类型（OPDS 已完成示范，继续推进其他模块；已有棘轮 `tests/error_ratchet.rs` 防止旧模式回升）
 - [ ] Linux 平台打包测试
 
 ## 测试注意事项
 
 - 前端测试使用 `vitest` + `@testing-library/react` + `jsdom`
 - `vitest.config.ts` 无 setupFiles，若新增测试需要 jest-dom matcher，需在测试文件顶部手动导入
-- 已修复 rollup 原生模块缺失问题（`CI=true pnpm install`），vitest 可正常运行
-- 现有 4 个测试文件 21 个用例：`src/__tests__/regression.test.ts`（搜索 sanitize、阅读预设、导入进度）、`src/types/__tests__/index.test.ts`、`src/stores/__tests__/app.test.ts`（含 applyRulesToBook 的 contentVersion 断言）、`src/hooks/__tests__/useReaderKeyboard.test.tsx`（输入框守卫）
-- Rust 侧已有 29 个测试（schema / search / parser / rules 模块），`cargo test` 在 `src-tauri/` 直接可运行
+- rollup 原生模块缺失问题已根治：运行时已钉住（`package.json` 的 `packageManager`/`engines` + `src-tauri/rust-toolchain.toml`），全新 `pnpm install` 无需 `CI=true` 等环境变量变通即可完成，vitest 正常运行
+- 前端测试位于各 `__tests__/` 目录：`src/__tests__/regression.test.ts`（搜索 sanitize、阅读预设、导入进度）、`src/__tests__/security-baseline.test.ts`（安全基线比对）、`src/types/__tests__/index.test.ts`、`src/stores/__tests__/app.test.ts`（含 applyRulesToBook 的 contentVersion 断言）、`src/hooks/__tests__/useReaderKeyboard.test.tsx`（输入框守卫）；文件清单与用例数以 `pnpm test`（仓库根目录）输出为准
+- Rust 测试覆盖 schema / search / parser / rules 模块，在 `src-tauri/` 目录运行 `cargo test` 验证；用例数以实际运行为准（历史快照见 `STATUS.md`）
+- `src-tauri/tests/error_ratchet.rs` 为错误处理迁移棘轮：旧式 `Result<T, String>` 数量上升即失败，下降时提示用 `UPDATE_ERROR_RATCHET=1 cargo test --test error_ratchet` 下调基线（`tests/error_ratchet_baseline.json` 随代码提交）
 
 ## 文档参考
 

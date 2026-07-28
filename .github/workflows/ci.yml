@@ -1,0 +1,89 @@
+name: CI 门禁
+
+on:
+  push:
+    branches: [master, main]
+  pull_request:
+
+jobs:
+  changes:
+    name: 检测变更区域
+    runs-on: ubuntu-latest
+    outputs:
+      frontend: ${{ steps.filter.outputs.frontend }}
+      backend: ${{ steps.filter.outputs.backend }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            frontend:
+              - 'src/**'
+              - 'index.html'
+              - 'package.json'
+              - 'pnpm-lock.yaml'
+              - 'tsconfig*.json'
+              - 'vite.config.ts'
+              - 'vitest.config.ts'
+            backend:
+              - 'src-tauri/**'
+              - '!src-tauri/icons/**'
+              - '!src-tauri/gen/**'
+
+  frontend:
+    name: 前端类型检查与测试
+    needs: changes
+    if: needs.changes.outputs.frontend == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      # pnpm 版本由 package.json 的 packageManager 字段钉住，不在此重复声明
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - name: 安装依赖
+        run: pnpm install --frozen-lockfile
+      - name: 类型检查
+        run: npx tsc --noEmit
+      - name: 单元测试
+        run: pnpm test
+
+  backend:
+    name: 后端编译检查与测试
+    needs: changes
+    if: needs.changes.outputs.backend == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: 安装 Tauri 系统依赖
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev build-essential curl wget file \
+            libssl-dev libgtk-3-dev libayatana-appindicator3-dev librsvg2-dev
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+      - name: 编译检查
+        run: cargo check
+        working-directory: src-tauri
+      - name: 单元测试
+        run: cargo test
+        working-directory: src-tauri
+
+  gate:
+    name: 门禁汇总
+    needs: [changes, frontend, backend]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: 任一检查失败即阻断
+        run: |
+          if [ "${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') }}" = "true" ]; then
+            echo "门禁失败：存在未通过的检查。"
+            exit 1
+          fi
+          echo "门禁通过。"

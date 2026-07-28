@@ -52,6 +52,7 @@ export function Switch({
           height: s.knob,
           top: (s.trackH - s.knob) / 2,
           left: checked ? s.trackW - s.knob - s.pad : s.pad,
+          // eslint-disable-next-line no-restricted-syntax -- 开关旋钮固定白色（iOS 风格），各主题通用
           background: "#fff",
           boxShadow: "var(--shadow-sm)",
         }}

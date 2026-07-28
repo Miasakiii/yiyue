@@ -1,4 +1,5 @@
 /** Highlight / annotation color palette shared by HighlightPopover & NotePanel */
+/* eslint-disable no-restricted-syntax -- 高亮色是随批注存入 DB 的数据调色板，非主题样式，不随主题切换 */
 export const HIGHLIGHT_COLORS = [
   { key: "1", name: "重点", color: "#EF4444" },
   { key: "2", name: "存疑", color: "#F97316" },
@@ -8,6 +9,7 @@ export const HIGHLIGHT_COLORS = [
   { key: "6", name: "感悟", color: "#A855F7" },
   { key: "7", name: "待确认", color: "#6B7280" },
 ] as const;
+/* eslint-enable no-restricted-syntax */
 
 /** Theme choices */
 export const THEMES = [

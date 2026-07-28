@@ -7,5 +7,7 @@ export default defineConfig({
     environment: "jsdom",
     globals: true,
     setupFiles: [],
+    // 只收集 src 下的测试，避免 node_modules.bak 等备份目录被误收集
+    include: ["src/**/*.{test,spec}.{ts,tsx}"],
   },
 });

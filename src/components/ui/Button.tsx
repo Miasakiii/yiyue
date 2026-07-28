@@ -16,6 +16,7 @@ const sizeClasses: Record<ButtonSize, string> = {
 const variantStyles: Record<ButtonVariant, CSSProperties> = {
   primary: {
     background: "linear-gradient(135deg, var(--accent), var(--accent-hover))",
+    // eslint-disable-next-line no-restricted-syntax -- accent 底上的白色前景，各主题通用，暂无 --text-on-accent 令牌
     color: "#fff",
     boxShadow: "0 2px 8px color-mix(in srgb, var(--accent) 30%, transparent)",
   },

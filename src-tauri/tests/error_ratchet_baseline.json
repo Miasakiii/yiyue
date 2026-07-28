@@ -1,0 +1,15 @@
+{
+  "commands/annotations.rs": 4,
+  "commands/bookmarks.rs": 4,
+  "commands/books.rs": 11,
+  "commands/dict.rs": 1,
+  "commands/export.rs": 3,
+  "commands/import.rs": 5,
+  "commands/rules.rs": 11,
+  "commands/search.rs": 8,
+  "commands/stats.rs": 6,
+  "commands/sync.rs": 12,
+  "commands/tags.rs": 12,
+  "parser/comic.rs": 3,
+  "sync/mod.rs": 7
+}

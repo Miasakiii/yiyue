@@ -1,0 +1,45 @@
+{
+  "$comment": "安全敏感配置基线快照。守护测试 src/__tests__/security-baseline.test.ts 会将 src-tauri/capabilities/default.json 与 src-tauri/tauri.conf.json 的安全段与本文件比对。任何扩权（新增权限、放宽 CSP、扩大 asset 协议范围）必须显式更新本基线，并在提交说明中记录理由。",
+  "capability": {
+    "identifier": "default",
+    "windows": ["main"],
+    "permissions": [
+      "core:default",
+      "core:webview:default",
+      "core:window:allow-close",
+      "core:window:allow-is-fullscreen",
+      "core:window:allow-is-maximized",
+      "core:window:allow-maximize",
+      "core:window:allow-minimize",
+      "core:window:allow-set-focus",
+      "core:window:allow-set-fullscreen",
+      "core:window:allow-start-dragging",
+      "core:window:allow-toggle-maximize",
+      "core:window:allow-unmaximize",
+      "core:window:default",
+      "dialog:allow-ask",
+      "dialog:allow-confirm",
+      "dialog:allow-message",
+      "dialog:allow-open",
+      "dialog:allow-save",
+      "dialog:default",
+      "opener:default"
+    ]
+  },
+  "csp": {
+    "base-uri": ["'self'"],
+    "connect-src": ["'self'", "http:", "https:"],
+    "default-src": ["'self'"],
+    "form-action": ["'self'"],
+    "frame-src": ["'none'"],
+    "img-src": ["'self'", "asset:", "blob:", "data:", "https://asset.localhost"],
+    "media-src": ["'self'", "asset:", "https://asset.localhost"],
+    "object-src": ["'none'"],
+    "script-src": ["'self'"],
+    "style-src": ["'self'", "'unsafe-inline'"]
+  },
+  "assetProtocol": {
+    "enable": true,
+    "scope": ["**"]
+  }
+}

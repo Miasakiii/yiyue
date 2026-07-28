@@ -91,9 +91,9 @@
 ### 环境要求
 
 ```
-Node.js >= 18
-Rust >= 1.75
-pnpm >= 8
+Node.js >= 22.12（engines 已声明）
+pnpm 11（package.json packageManager 钉住 11.3.0）
+Rust 1.95.0（src-tauri/rust-toolchain.toml 钉住，rustup 自动安装）
 ```
 
 ### 安装依赖
