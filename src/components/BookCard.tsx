@@ -54,8 +54,12 @@ export function BookCard({ book, viewMode }: BookCardProps) {
   const ctxRef = useRef<HTMLDivElement>(null);
   // Cover falls back to the format badge if the file can't be loaded
   const [coverError, setCoverError] = useState(false);
+  // Dedupe tag/group association fetches (mount + first right-click race)
+  const assocLoadedRef = useRef(false);
 
-  const loadBookAssociations = useCallback(async () => {
+  const loadBookAssociations = useCallback(async (force = false) => {
+    if (!force && assocLoadedRef.current) return;
+    assocLoadedRef.current = true;
     const [bt, bg] = await Promise.all([
       getBookTags(book.id),
       getBookGroups(book.id),
@@ -63,6 +67,11 @@ export function BookCard({ book, viewMode }: BookCardProps) {
     setBookTags(bt);
     setBookGroups(bg);
   }, [book.id, getBookTags, getBookGroups]);
+
+  // Load tag dots once when the card mounts, not only on right-click
+  useEffect(() => {
+    loadBookAssociations();
+  }, [loadBookAssociations]);
 
   const handleContextMenu = useCallback((e: React.MouseEvent) => {
     e.preventDefault();
@@ -95,7 +104,7 @@ export function BookCard({ book, viewMode }: BookCardProps) {
     } else {
       await addBookTag(book.id, tagId);
     }
-    await loadBookAssociations();
+    await loadBookAssociations(true);
   };
 
   const toggleBookGroup = async (groupId: string) => {
@@ -105,7 +114,7 @@ export function BookCard({ book, viewMode }: BookCardProps) {
     } else {
       await addBookGroup(book.id, groupId);
     }
-    await loadBookAssociations();
+    await loadBookAssociations(true);
   };
 
   const formatSize = (bytes: number) => {
