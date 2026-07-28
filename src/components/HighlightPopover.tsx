@@ -281,7 +281,7 @@ export function HighlightPopover({
               <>
                 <div className="w-px h-5 mx-0.5" style={{ background: "var(--border)" }} />
                 <button
-                  className="w-6 h-6 rounded-md flex items-center justify-center hover:scale-110 transition-transform"
+                  className="w-6 h-6 rounded flex items-center justify-center hover:scale-110 transition-transform"
                   style={{
                     background: showDict ? "var(--accent-soft)" : "var(--bg-tertiary)",
                     color: showDict ? "var(--accent)" : "var(--text-tertiary)",
@@ -299,7 +299,7 @@ export function HighlightPopover({
             {/* Copy button */}
             <div className="w-px h-5 mx-0.5" style={{ background: "var(--border)" }} />
             <button
-              className="w-6 h-6 rounded-md flex items-center justify-center hover:scale-110 transition-transform"
+              className="w-6 h-6 rounded flex items-center justify-center hover:scale-110 transition-transform"
               style={{ background: "var(--bg-tertiary)", color: "var(--text-tertiary)" }}
               onClick={() => {
                 navigator.clipboard.writeText(selectedText);
@@ -315,7 +315,7 @@ export function HighlightPopover({
 
             {/* Search button */}
             <button
-              className="w-6 h-6 rounded-md flex items-center justify-center hover:scale-110 transition-transform"
+              className="w-6 h-6 rounded flex items-center justify-center hover:scale-110 transition-transform"
               style={{ background: "var(--bg-tertiary)", color: "var(--text-tertiary)" }}
               onClick={() => {
                 window.dispatchEvent(new CustomEvent("search-with-text", { detail: { text: selectedText } }));

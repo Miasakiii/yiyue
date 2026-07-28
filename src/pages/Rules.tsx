@@ -298,7 +298,7 @@ export function Rules() {
                     </div>
                     <div className="flex items-center gap-1 flex-shrink-0">
                       <button
-                        className="p-1.5 rounded-lg hover-bg"
+                        className="p-1.5 rounded hover-bg"
                         style={{ color: "var(--text-tertiary)" }}
                         onClick={() => handleEdit(rule)}
                         title="编辑"
@@ -309,7 +309,7 @@ export function Rules() {
                         </svg>
                       </button>
                       <button
-                        className="p-1.5 rounded-lg hover-bg"
+                        className="p-1.5 rounded hover-bg"
                         style={{ color: "var(--text-tertiary)" }}
                         onClick={() => handleDelete(rule.id)}
                         title="删除"
@@ -387,7 +387,7 @@ export function Rules() {
             <div className="flex items-center gap-2">
               <label className="text-xs" style={{ color: "var(--text-secondary)" }}>作用域</label>
               <select
-                className="px-2 py-1 rounded-lg text-xs outline-none"
+                className="px-2 py-1 rounded text-xs outline-none"
                 style={selectStyle}
                 value={form.scope}
                 onChange={(e) => setForm({ ...form, scope: e.target.value })}
@@ -400,7 +400,7 @@ export function Rules() {
             <div className="flex items-center gap-2">
               <label className="text-xs" style={{ color: "var(--text-secondary)" }}>分组</label>
               <select
-                className="px-2 py-1 rounded-lg text-xs outline-none"
+                className="px-2 py-1 rounded text-xs outline-none"
                 style={selectStyle}
                 value={form.group_id ?? ""}
                 onChange={(e) => setForm({ ...form, group_id: e.target.value || null })}

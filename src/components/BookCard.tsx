@@ -8,6 +8,7 @@ interface BookCardProps {
   viewMode: "grid" | "list";
 }
 
+/* eslint-disable no-restricted-syntax -- 格式徽章色是固定品牌色数据映射，非主题样式，不随主题切换 */
 const FORMAT_COLORS: Record<string, string> = {
   txt: "#6366f1",
   epub: "#8b5cf6",
@@ -16,6 +17,7 @@ const FORMAT_COLORS: Record<string, string> = {
   markdown: "#22c55e",
   cbz: "#f59e0b",
 };
+/* eslint-enable no-restricted-syntax */
 
 const FORMAT_LABELS: Record<string, string> = {
   txt: "TXT",
@@ -118,6 +120,7 @@ export function BookCard({ book, viewMode }: BookCardProps) {
     return `${Math.round(pct)}%`;
   };
 
+  // eslint-disable-next-line no-restricted-syntax -- 回退色与 FORMAT_COLORS 同属徽章数据调色板
   const formatColor = FORMAT_COLORS[book.format] || "#6366f1";
   const progress = Math.min(book.reading_percentage || 0, 100);
 
@@ -160,6 +163,7 @@ export function BookCard({ book, viewMode }: BookCardProps) {
           }}
           onClick={() => openBook(book.id)}
           onContextMenu={handleContextMenu}
+          // eslint-disable-next-line no-restricted-syntax -- 非 hover 样式：离开卡片时复位删除二次确认状态
           onMouseLeave={() => setShowDeleteConfirm(false)}
         >
           {/* Format badge */}
@@ -191,7 +195,7 @@ export function BookCard({ book, viewMode }: BookCardProps) {
               </span>
             </div>
             <button
-              className="p-1.5 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity"
+              className="p-1.5 rounded opacity-0 group-hover:opacity-100 transition-opacity"
               style={{ color: book.starred ? "var(--warning)" : "var(--text-tertiary)" }}
               onClick={(e) => { e.stopPropagation(); toggleFavorite(book.id); }}
             >
@@ -200,7 +204,7 @@ export function BookCard({ book, viewMode }: BookCardProps) {
               </svg>
             </button>
             <button
-              className="p-1.5 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity"
+              className="p-1.5 rounded opacity-0 group-hover:opacity-100 transition-opacity"
               style={{
                 color: showDeleteConfirm ? "var(--error)" : "var(--text-tertiary)",
                 background: showDeleteConfirm ? "var(--error-soft)" : "transparent",
@@ -230,6 +234,7 @@ export function BookCard({ book, viewMode }: BookCardProps) {
         }}
         onClick={() => openBook(book.id)}
         onContextMenu={handleContextMenu}
+        // eslint-disable-next-line no-restricted-syntax -- 非 hover 样式：离开卡片时复位删除二次确认状态
         onMouseLeave={() => setShowDeleteConfirm(false)}
       >
         {/* Cover */}
@@ -260,7 +265,7 @@ export function BookCard({ book, viewMode }: BookCardProps) {
                 </svg>
               </div>
               <span
-                className="text-xs font-bold px-2.5 py-1 rounded-md"
+                className="text-xs font-bold px-2.5 py-1 rounded"
                 style={{ background: formatColor, color: "white", boxShadow: `0 2px 6px ${formatColor}40` }}
               >
                 {FORMAT_LABELS[book.format] || book.format.toUpperCase()}
@@ -275,7 +280,7 @@ export function BookCard({ book, viewMode }: BookCardProps) {
           )}
           {progress >= 100 && (
             <div
-              className="absolute top-2 right-2 px-1.5 py-0.5 rounded-md text-xs font-medium"
+              className="absolute top-2 right-2 px-1.5 py-0.5 rounded text-xs font-medium"
               style={{ background: "var(--success)", color: "white" }}
             >
               已读完
@@ -289,7 +294,7 @@ export function BookCard({ book, viewMode }: BookCardProps) {
             </div>
           )}
           <button
-            className="absolute bottom-2 right-2 p-1.5 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity"
+            className="absolute bottom-2 right-2 p-1.5 rounded opacity-0 group-hover:opacity-100 transition-opacity"
             style={{
               background: showDeleteConfirm ? "var(--error)" : "var(--overlay-bg)",
               color: "white",

@@ -200,7 +200,7 @@ export function Stats() {
                   {calendarData.map((day) => (
                     <div
                       key={day.date}
-                      className="w-3.5 h-3.5 rounded-sm cursor-default transition-transform hover:scale-125"
+                      className="w-3.5 h-3.5 rounded-[2px] cursor-default transition-transform hover:scale-125"
                       style={{
                         background: HEAT_COLORS[day.level],
                       }}
@@ -221,7 +221,7 @@ export function Stats() {
                 {HEAT_COLORS.map((color, i) => (
                   <div
                     key={i}
-                    className="w-3 h-3 rounded-sm"
+                    className="w-3 h-3 rounded-[2px]"
                     style={{ background: color }}
                   />
                 ))}
@@ -316,7 +316,7 @@ function StatCard({
       }}
     >
       <div
-        className="w-9 h-9 rounded-lg flex items-center justify-center mb-3"
+        className="w-9 h-9 rounded flex items-center justify-center mb-3"
         style={{
           background: `color-mix(in srgb, ${color} 12%, transparent)`,
           color: color,

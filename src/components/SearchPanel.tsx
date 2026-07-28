@@ -157,7 +157,7 @@ export function SearchPanel({
   return (
     <div
       className="fixed inset-0 flex items-start justify-center pt-[12vh] animate-fade-in"
-      style={{ background: "var(--overlay-bg)", backdropFilter: "blur(4px)", zIndex: "var(--z-modal)" }}
+      style={{ background: "var(--overlay-bg)", backdropFilter: "blur(4px)", WebkitBackdropFilter: "blur(4px)", zIndex: "var(--z-modal)" }}
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}

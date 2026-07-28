@@ -540,7 +540,7 @@ export function Reader() {
             {/* Chapter selector */}
             <div className="relative">
               <select
-                className="text-xs px-2 py-1.5 rounded-lg outline-none cursor-pointer appearance-none pr-6"
+                className="text-xs px-2 py-1.5 rounded outline-none cursor-pointer appearance-none pr-6"
                 style={{
                   background: "var(--bg-tertiary)",
                   color: "var(--text-secondary)",

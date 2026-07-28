@@ -123,6 +123,7 @@ export function LanTransfer() {
                         style={{
                           // Intentional fixed white: QR modules are black and need
                           // a light backdrop to stay scannable in every theme.
+                          // eslint-disable-next-line no-restricted-syntax -- 见上：二维码可扫描性约束
                           background: "#fff",
                           border: "1px solid var(--border)",
                         }}

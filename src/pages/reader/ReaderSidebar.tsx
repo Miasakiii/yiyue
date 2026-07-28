@@ -59,7 +59,7 @@ export function ReaderSidebar({
             书签 ({bookmarks.length})
           </span>
           <button
-            className="p-1 rounded-lg flex items-center justify-center hover-bg"
+            className="p-1 rounded flex items-center justify-center hover-bg"
             style={{ color: "var(--text-tertiary)" }}
             onClick={addBookmark}
             title="添加书签 (Ctrl+Shift+B)"

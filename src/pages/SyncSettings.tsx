@@ -267,7 +267,7 @@ export function SyncSettings() {
                       间隔
                     </span>
                     <select
-                      className="px-2 py-1 rounded-lg text-xs outline-none"
+                      className="px-2 py-1 rounded text-xs outline-none"
                       style={{
                         background: "var(--bg-primary)",
                         color: "var(--text-primary)",

@@ -4,14 +4,16 @@ import { useNavigate } from "react-router-dom";
 import { useAppStore } from "../stores/app";
 import { BookCard } from "../components/BookCard";
 import { Button, Dialog, Input } from "../components/ui";
-import { SUPPORTED_EXTENSIONS } from "../constants";
+import { SUPPORTED_EXTENSIONS, THEMES } from "../constants";
 
 type SortKey = "recent" | "added" | "title" | "progress";
 
+/* eslint-disable no-restricted-syntax -- 标签色是存入 DB 的数据调色板，非主题样式，不随主题切换 */
 const TAG_COLORS = [
   "#6366f1", "#8b5cf6", "#ef4444", "#f59e0b",
   "#22c55e", "#06b6d4", "#ec4899", "#6b7280",
 ];
+/* eslint-enable no-restricted-syntax */
 
 const SORT_OPTIONS: { key: SortKey; label: string }[] = [
   { key: "recent", label: "最近阅读" },
@@ -85,7 +87,7 @@ export function Library() {
     books, loading, viewMode, setViewMode, importBook,
     tags, groups, activeTag, activeGroup,
     loadTags, loadGroups, createTag, deleteTag, createGroup, deleteGroup,
-    setActiveTag, setActiveGroup, loadBooks,
+    setActiveTag, setActiveGroup, loadBooks, setFilter, theme, setTheme,
   } = useAppStore();
 
   const [sortBy, setSortBy] = useState<SortKey>("recent");
@@ -386,7 +388,7 @@ export function Library() {
             </span>
           )}
           <button
-            className="p-1 rounded-md hover-bg"
+            className="p-1 rounded hover-bg"
             onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
             title={sidebarCollapsed ? "展开侧边栏" : "折叠侧边栏"}
           >
@@ -604,7 +606,7 @@ export function Library() {
           <div className="flex items-center gap-2">
             {/* Sort dropdown */}
             <select
-              className="text-xs px-3 py-1.5 rounded-lg outline-none cursor-pointer"
+              className="text-xs px-3 py-1.5 rounded-sm outline-none cursor-pointer"
               style={{
                 background: "var(--bg-tertiary)",
                 color: "var(--text-secondary)",
@@ -622,7 +624,7 @@ export function Library() {
 
             {/* View mode toggle */}
             <div
-              className="flex rounded-lg overflow-hidden"
+              className="flex rounded-sm overflow-hidden"
               style={{ border: "1px solid var(--border)" }}
             >
               <button
@@ -656,6 +658,42 @@ export function Library() {
                   <line x1="3" y1="18" x2="21" y2="18" />
                 </svg>
               </button>
+            </div>
+
+            {/* Theme switcher */}
+            <div className="flex items-center gap-0.5 p-0.5 rounded-sm"
+              style={{ background: "var(--bg-tertiary)", border: "1px solid var(--border)" }}>
+              {THEMES.map((t) => (
+                <button
+                  key={t.key}
+                  title={`主题：${t.label}`}
+                  className="p-1.5 rounded transition-all"
+                  style={
+                    theme === t.key
+                      ? { background: "var(--bg-elevated)", color: "var(--accent)", boxShadow: "var(--shadow-sm)" }
+                      : { color: "var(--text-tertiary)" }
+                  }
+                  onClick={() => setTheme(t.key)}
+                >
+                  {t.key === "light" ? (
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <circle cx="12" cy="12" r="4" />
+                      <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41" />
+                    </svg>
+                  ) : t.key === "dark" ? (
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
+                    </svg>
+                  ) : (
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                      <polyline points="14 2 14 8 20 8" />
+                      <line x1="8" y1="13" x2="16" y2="13" />
+                      <line x1="8" y1="17" x2="13" y2="17" />
+                    </svg>
+                  )}
+                </button>
+              ))}
             </div>
 
             {/* More menu */}
@@ -789,7 +827,7 @@ export function Library() {
                   {["TXT", "EPUB", "PDF", "MD", "CBZ", "DOCX"].map((fmt) => (
                     <span
                       key={fmt}
-                      className="text-xs px-2.5 py-1 rounded-md"
+                      className="text-xs px-2.5 py-1 rounded"
                       style={{
                         background: "var(--bg-tertiary)",
                         color: "var(--text-tertiary)",
@@ -814,7 +852,7 @@ export function Library() {
                 <div
                   key={book.id}
                   className="animate-slide-up"
-                  style={{ animationDelay: `${Math.min(i * 30, 300)}ms`, animationFillMode: "both" }}
+                  style={{ animationDelay: `${Math.min(i * 30, 300)}ms`, animationFillMode: "backwards" }}
                 >
                   <BookCard book={book} viewMode={viewMode} />
                 </div>
@@ -952,7 +990,7 @@ function SidebarItem({
 }) {
   return (
     <div
-      className="flex items-center gap-2 px-2 py-1.5 rounded-lg cursor-pointer group transition-all hover-bg"
+      className="flex items-center gap-2 px-2 py-1.5 rounded-sm cursor-pointer group transition-all hover-bg"
       style={{
         background: active ? "var(--accent-soft)" : undefined,
         color: active ? "var(--accent)" : "var(--text-secondary)",

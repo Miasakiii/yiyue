@@ -93,19 +93,19 @@
 }
 
 .sepia {
-  --bg-primary: #f7f0e6;
-  --bg-secondary: #efe7d9;
-  --bg-tertiary: #e5dccb;
-  --bg-elevated: #f7f0e6;
-  --text-primary: #433422;
-  --text-secondary: #7c6b56;
-  --text-tertiary: #a89880;
-  --border: #d8ccb8;
-  --border-light: #e5dccb;
-  --accent: #9a7b4e;
-  --accent-hover: #7d6340;
-  --accent-light: #f5ead5;
-  --accent-soft: rgba(154, 123, 78, 0.1);
+  --bg-primary: #ddd2b6;
+  --bg-secondary: #d4c7a6;
+  --bg-tertiary: #c7b891;
+  --bg-elevated: #e2d9c1;
+  --text-primary: #5a4c34;
+  --text-secondary: #7d6d52;
+  --text-tertiary: #a1906c;
+  --border: #c4b491;
+  --border-light: #d1c5a2;
+  --accent: #8a6d3f;
+  --accent-hover: #6f5730;
+  --accent-light: #d8cbaa;
+  --accent-soft: rgba(138, 109, 63, 0.12);
   --shadow-sm: 0 1px 2px rgba(60, 46, 30, 0.05);
   --shadow-md: 0 4px 12px rgba(60, 46, 30, 0.07);
   --shadow-lg: 0 8px 24px rgba(60, 46, 30, 0.09);
@@ -275,6 +275,11 @@ button {
 
 button:active {
   transform: scale(0.98);
+}
+
+button:disabled {
+  cursor: default;
+  opacity: 0.5;
 }
 
 /* Input base styles */

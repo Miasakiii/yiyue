@@ -62,13 +62,13 @@ export function ReaderSettings({
       style={{
         width: 260, background: "var(--bg-elevated)", border: "1px solid var(--border)",
         borderRadius: "var(--radius-md)", boxShadow: "var(--shadow-xl)", padding: "8px 0",
-        maxHeight: "min(70vh, 560px)", overflowY: "auto", zIndex: "var(--z-popover)",
+        maxHeight: "min(70vh, 560px)", overflowY: "auto", zIndex: "var(--z-modal)",
       }}>
       {/* Header + close */}
       <div className="flex items-center justify-between px-3 pb-1.5"
         style={{ borderBottom: "1px solid var(--border-light)" }}>
         <span className="text-xs font-semibold" style={{ color: "var(--text-secondary)" }}>阅读设置</span>
-        <button className="p-1 rounded-md hover-bg"
+        <button className="p-1 rounded hover-bg"
           style={{ color: "var(--text-tertiary)" }}
           onClick={onClose}
           title="关闭">
