@@ -76,12 +76,23 @@ export function NotePanel({
     } catch (e) {
       console.error("Export failed:", e);
     }
-  }, []);
+  }, [bookId]);
 
   useEffect(() => {
     if (!visible) return;
     loadAnnotations();
   }, [visible, bookId, chapterId]);
+
+  // Reload when a highlight/note is created elsewhere (e.g. HighlightPopover)
+  useEffect(() => {
+    const onChanged = (e: Event) => {
+      const detail = (e as CustomEvent<{ bookId?: string }>).detail;
+      if (detail?.bookId !== bookId) return;
+      if (visible) loadAnnotations();
+    };
+    window.addEventListener("annotations-changed", onChanged);
+    return () => window.removeEventListener("annotations-changed", onChanged);
+  }, [bookId, visible, chapterId]);
 
   const loadAnnotations = async () => {
     try {

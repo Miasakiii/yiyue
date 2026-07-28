@@ -62,9 +62,25 @@ export function HighlightPopover({
       const range = selection.getRangeAt(0);
       const rect = range.getBoundingClientRect();
 
+      // Convert selection offsets (relative to their text node) into global
+      // character offsets within the article's textContent, so the jump-to
+      // logic in Reader can locate the annotation. Legacy annotations keep
+      // their old node-relative values; only new ones store global offsets.
+      const startNode = range.startContainer;
+      const article =
+        (startNode instanceof Element ? startNode : startNode.parentElement)?.closest("article") ??
+        document.querySelector("article");
+      const toGlobalOffset = (container: Node, offset: number) => {
+        if (!article) return offset;
+        const pre = range.cloneRange();
+        pre.selectNodeContents(article);
+        pre.setEnd(container, offset);
+        return pre.toString().length;
+      };
+
       setSelectedText(text);
-      setStartOffset(range.startOffset);
-      setEndOffset(range.endOffset);
+      setStartOffset(toGlobalOffset(range.startContainer, range.startOffset));
+      setEndOffset(toGlobalOffset(range.endContainer, range.endOffset));
       setAnchor({
         x: rect.left + rect.width / 2,
         top: rect.top - 10,
@@ -117,7 +133,10 @@ export function HighlightPopover({
     const fitsAbove = anchor.top - h >= margin;
     const fitsBelow = anchor.bottom + h <= vh - margin;
     const above = fitsAbove || !fitsBelow;
-    setPlacement({ x, y: above ? anchor.top : anchor.bottom, above });
+    // Clamp y so the popover can't stick out above the viewport top when
+    // neither above nor below has enough room.
+    const y = Math.max(above ? anchor.top : anchor.bottom, margin);
+    setPlacement({ x, y, above });
   }, [visible, anchor, showNoteInput, showDict, dictLoading, dictResult]);
 
   const createHighlight = async (color: string, note?: string) => {
@@ -141,6 +160,8 @@ export function HighlightPopover({
       setShowNoteInput(false);
       setNoteText("");
       window.getSelection()?.removeAllRanges();
+      // Notify open panels (e.g. NotePanel) that the annotations changed.
+      window.dispatchEvent(new CustomEvent("annotations-changed", { detail: { bookId } }));
       onCreated?.();
     } catch (e) {
       console.error("Failed to create highlight:", e);
