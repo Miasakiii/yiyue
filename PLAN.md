@@ -67,11 +67,11 @@
 | # | 事项 | 来源 | 说明 | 预估 |
 |---|---|---|---|---|
 | 3.4.1 | **数据导入/导出（全量）** | 🗺 5.3.5 | 书籍元数据+笔记+进度+规则 → ZIP；支持从 Koodo/Calibre 导入笔记 | 2 天 |
-| 3.4.2 | **ComicInfo.xml 元数据** | 🗺 5.2.5 | 解析 CBZ 内 ComicRack 标准元数据（作者/系列/卷号） | 1 天 |
+| 3.4.2 | ~~ComicInfo.xml 元数据~~ | 🗺 5.2.5 | ✅ b90978d：CBZ 内 ComicRack 标准提取（Writer/Series/Volume/Year/Summary），Writer 优先、Summary 入简介、并入 metadata_json；2 单测 | — |
 | 3.4.3 | **免费书源接入** | 🗺 5.3.6 | Project Gutenberg / 书格，OPDS 协议浏览+一键下载导入 | 2-3 天 |
 | 3.4.4 | **Calibre 桥接** | 🗺 5.3.3 | 检测本地 Calibre，调 `calibredb` CLI 做格式转换/元数据同步 | 2 天 |
 | 3.4.5 | **WebDAV 同步范围扩展** | 🗺 5.3.4 | 同步书签、阅读目标；last-write-wins + 本地优先 | 2 天 |
-| 3.4.6 | **规则包导出/导入** | 🗺 4.2.5 | 清洗规则 JSON 导出分享 | 1 天 |
+| 3.4.6 | ~~规则包导出/导入~~ | 🗺 4.2.5 | ✅ b90978d：版本化 JSON 导出/导入（预设组跳过、同名组复用）+ Rules 页按钮（save/open 对话框 + Toast）；IPC +4（共 76） | — |
 
 ---
 
