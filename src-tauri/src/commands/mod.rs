@@ -1,5 +1,6 @@
 pub mod achievements;
 pub mod annotations;
+pub mod backup;
 pub mod bookmarks;
 pub mod books;
 pub mod dict;

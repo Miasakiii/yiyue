@@ -1,7 +1,9 @@
 import { useEffect, useState } from "react";
-import { AlertCircle, BookOpen, Download, Eye, Globe, Info, RefreshCw, Upload } from "lucide-react";
+import { AlertCircle, Archive, BookOpen, Download, Eye, Globe, Info, RefreshCw, Upload } from "lucide-react";
 import { invoke } from "@tauri-apps/api/core";
-import { PageHeader, Button, Input, Switch } from "../components/ui";
+import { useAppStore } from "../stores/app";
+import { PageHeader, Button, Input, Switch, Dialog } from "../components/ui";
+import { showToast } from "../components/Toast";
 
 interface WebDavConfig {
   server_url: string;
@@ -38,6 +40,9 @@ export function SyncSettings() {
   const [enriching, setEnriching] = useState(false);
   const [enrichProgress, setEnrichProgress] = useState({ current: 0, total: 0 });
   const [metaMessage, setMetaMessage] = useState("");
+  const [confirmImport, setConfirmImport] = useState(false);
+  const [importPath, setImportPath] = useState("");
+  const [importing, setImporting] = useState(false);
 
   useEffect(() => {
     loadData();
@@ -88,6 +93,51 @@ export function SyncSettings() {
     } finally {
       setEnriching(false);
       setTimeout(() => setMetaMessage(""), 5000);
+    }
+  };
+
+  const handleExportData = async () => {
+    try {
+      const { save } = await import("@tauri-apps/plugin-dialog");
+      const path = await save({
+        defaultPath: `yiyue-backup-${new Date().toISOString().slice(0, 10)}.zip`,
+        filters: [{ name: "一页备份", extensions: ["zip"] }],
+      });
+      if (!path) return;
+      await invoke("export_all_data", { path });
+      showToast("数据已导出（不含书籍源文件）", "success");
+    } catch (e) {
+      showToast(`导出失败: ${String(e)}`, "error");
+    }
+  };
+
+  const pickImportFile = async () => {
+    try {
+      const { open } = await import("@tauri-apps/plugin-dialog");
+      const path = await open({ multiple: false, filters: [{ name: "一页备份", extensions: ["zip"] }] });
+      if (!path) return;
+      setImportPath(path);
+      setConfirmImport(true);
+    } catch (e) {
+      showToast(`打开文件失败: ${String(e)}`, "error");
+    }
+  };
+
+  const doImport = async () => {
+    setImporting(true);
+    try {
+      const stats = await invoke<{ total_inserted: number; per_table: Record<string, number> }>(
+        "import_all_data",
+        { path: importPath },
+      );
+      setConfirmImport(false);
+      const loadBooks = useAppStore.getState().loadBooks;
+      await loadBooks();
+      showToast(`导入完成：共 ${stats.total_inserted} 条记录`, "success");
+    } catch (e) {
+      showToast(`导入失败: ${String(e)}`, "error");
+    } finally {
+      setImporting(false);
     }
   };
 
@@ -413,8 +463,55 @@ export function SyncSettings() {
               </div>
             </div>
           </div>
+
+          {/* Data backup card (PLAN 3.4.1) */}
+          <div
+            className="rounded-xl p-5"
+            style={{
+              background: "var(--bg-secondary)",
+              border: "1px solid var(--border-light)",
+            }}
+          >
+            <h2 className="text-sm font-semibold mb-4 flex items-center gap-2">
+              <Archive size={16} strokeWidth={2} />
+              数据备份
+            </h2>
+            <div className="flex items-center gap-3">
+              <Button variant="secondary" size="sm" onClick={handleExportData}>
+                <Download size={13} strokeWidth={2} />
+                导出全量数据
+              </Button>
+              <Button variant="secondary" size="sm" onClick={pickImportFile} disabled={importing}>
+                <Upload size={13} strokeWidth={2} />
+                {importing ? "导入中…" : "从备份恢复"}
+              </Button>
+            </div>
+            <p className="mt-3 text-xs" style={{ color: "var(--text-tertiary)" }}>
+              导出内容：书籍元数据、章节、笔记划线、书签、进度、标签分组、规则、成就、设置（不含书籍源文件，library/ 目录请另行备份）。
+            </p>
+          </div>
         </div>
       </main>
+
+      <Dialog
+        open={confirmImport}
+        onClose={() => setConfirmImport(false)}
+        title="确认恢复备份"
+        footer={
+          <>
+            <Button variant="secondary" size="sm" onClick={() => setConfirmImport(false)}>
+              取消
+            </Button>
+            <Button size="sm" onClick={doImport} disabled={importing}>
+              {importing ? "导入中…" : "确认导入"}
+            </Button>
+          </>
+        }
+      >
+        <p className="text-sm" style={{ color: "var(--text-secondary)" }}>
+          将从备份恢复数据。已有记录（相同 ID）会被跳过，不会覆盖现有数据；恢复后全文索引将自动重建。
+        </p>
+      </Dialog>
     </div>
   );
 }
