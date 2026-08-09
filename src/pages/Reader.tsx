@@ -442,7 +442,12 @@ export function Reader() {
   const handleAddBookmark = useCallback(() => {
     if (!currentBook || !currentChapter) return;
     const chapterIdx = chapters.findIndex((c) => c.id === currentChapter.id);
-    const scrollOffset = progress?.scroll_offset ?? 0;
+    // Prefer live viewport over debounced store progress (avoids stale offset)
+    let scrollOffset = progress?.scroll_offset ?? 0;
+    if (contentRef.current) {
+      const { pos, max } = scrollAxis(contentRef.current);
+      scrollOffset = max > 0 ? pos / max : 0;
+    }
     const chapterTitle = currentChapter.title || `第 ${chapterIdx + 1} 章`;
     const title = `${chapterIdx + 1}. ${chapterTitle} · ${Math.round(scrollOffset * 100)}%`;
     createBookmark({
@@ -456,20 +461,42 @@ export function Reader() {
         setShowSidebar(true);
       })
       .catch(() => {});
-  }, [currentBook, currentChapter, chapters, progress, createBookmark]);
+  }, [currentBook, currentChapter, chapters, progress, createBookmark, scrollAxis]);
 
-  const handleJumpToBookmark = (bookmark: Bookmark) => {
+  const handleJumpToBookmark = useCallback((bookmark: Bookmark) => {
     if (!bookmark.chapter_id) return;
     loadChapter(bookmark.chapter_id).then(() => {
       setTimeout(() => {
         if (!contentRef.current) return;
         const el = contentRef.current;
-        const scrollHeight = el.scrollHeight - el.clientHeight;
-        el.scrollTop = bookmark.scroll_offset * scrollHeight;
+        const { max } = scrollAxis(el);
+        if (readingMode === "columns") {
+          el.scrollLeft = bookmark.scroll_offset * max;
+        } else {
+          el.scrollTop = bookmark.scroll_offset * max;
+        }
         setShowSidebar(false);
       }, 150);
     });
-  };
+  }, [loadChapter, readingMode, scrollAxis]);
+
+  const tryTurnPage = useCallback((dir: 1 | -1) => {
+    if (readingMode !== "columns" || !contentRef.current) return false;
+    const el = contentRef.current;
+    const pageWidth = Math.max(el.clientWidth, 1);
+    const max = el.scrollWidth - el.clientWidth;
+    if (max <= 2) return false;
+    const epsilon = 4;
+    if (dir > 0 && el.scrollLeft < max - epsilon) {
+      el.scrollTo({ left: Math.min(el.scrollLeft + pageWidth, max), behavior: "smooth" });
+      return true;
+    }
+    if (dir < 0 && el.scrollLeft > epsilon) {
+      el.scrollTo({ left: Math.max(el.scrollLeft - pageWidth, 0), behavior: "smooth" });
+      return true;
+    }
+    return false;
+  }, [readingMode]);
 
   /* ---- Keyboard navigation ---- */
   useReaderKeyboard({
@@ -477,13 +504,43 @@ export function Reader() {
     setShowSidebar, setShowNotes, setSettingsOpen,
     settingsOpen, showNotes, showSidebar,
     toggleImmersive: () => setImmersive((v) => !v), handleAddBookmark, currentBook,
+    tryTurnPage,
   });
 
-  /* ---- Restore scroll position ---- */
+  /* ---- Restore scroll / pending search jump ---- */
   useEffect(() => {
-    if (!content || !progress || !currentChapter || !contentRef.current) return;
+    if (!content || !currentChapter || !contentRef.current) return;
+
+    const PENDING_KEY = "yiyue.pendingSearchJump";
+    const raw = sessionStorage.getItem(PENDING_KEY);
+    if (raw) {
+      try {
+        const pending = JSON.parse(raw) as { chapterId?: string; matchedText?: string };
+        if (pending.chapterId && pending.chapterId !== currentChapter.id) {
+          // Wait until the target chapter content is loaded
+          return;
+        }
+        sessionStorage.removeItem(PENDING_KEY);
+        const needle = (pending.matchedText || "").trim();
+        if (needle) {
+          const article = contentRef.current.querySelector("article");
+          const text = article?.textContent || "";
+          const idx = text.indexOf(needle);
+          if (idx >= 0 && text.length > 0) {
+            const ratio = Math.min(idx / text.length, 1);
+            const { max } = scrollAxis(contentRef.current);
+            if (readingMode === "columns") contentRef.current.scrollLeft = ratio * max;
+            else contentRef.current.scrollTop = ratio * max;
+            return;
+          }
+        }
+      } catch {
+        sessionStorage.removeItem(PENDING_KEY);
+      }
+    }
+
     // Only restore scroll if progress matches the current chapter
-    if (progress.chapter_id !== currentChapter.id) return;
+    if (!progress || progress.chapter_id !== currentChapter.id) return;
     const el = contentRef.current;
     const { max } = scrollAxis(el);
     if (readingMode === "columns") el.scrollLeft = progress.scroll_offset * max;

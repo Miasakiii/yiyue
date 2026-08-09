@@ -17,6 +17,8 @@ interface UseReaderKeyboardOpts {
   toggleImmersive: () => void;
   handleAddBookmark: () => void;
   currentBook: { id: string } | null;
+  /** Columns mode: try in-chapter page turn first. Return true if handled. */
+  tryTurnPage?: (dir: 1 | -1) => boolean;
 }
 
 export function useReaderKeyboard({
@@ -24,6 +26,7 @@ export function useReaderKeyboard({
   setShowSidebar, setShowNotes, setSettingsOpen,
   settingsOpen, showNotes, showSidebar,
   toggleImmersive, handleAddBookmark, currentBook,
+  tryTurnPage,
 }: UseReaderKeyboardOpts) {
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -35,6 +38,11 @@ export function useReaderKeyboard({
       if (!currentChapter) return;
       const chapterIndex = chapters.findIndex((c) => c.id === currentChapter.id);
       if (e.key === "ArrowRight" || e.key === "PageDown") {
+        // Columns: turn page within chapter first; only switch chapter at the edge.
+        if (tryTurnPage?.(1)) {
+          e.preventDefault();
+          return;
+        }
         // Only swallow the key when it actually turns a page — at the
         // boundary let it fall through instead of being a dead key.
         if (chapterIndex < chapters.length - 1) {
@@ -42,6 +50,10 @@ export function useReaderKeyboard({
           loadChapter(chapters[chapterIndex + 1].id);
         }
       } else if (e.key === "ArrowLeft" || e.key === "PageUp") {
+        if (tryTurnPage?.(-1)) {
+          e.preventDefault();
+          return;
+        }
         if (chapterIndex > 0) {
           e.preventDefault();
           loadChapter(chapters[chapterIndex - 1].id);
@@ -87,5 +99,5 @@ export function useReaderKeyboard({
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [currentChapter, chapters, loadChapter, setFontSize, setShowSidebar, setShowNotes, setSettingsOpen, settingsOpen, showNotes, showSidebar, currentBook, handleAddBookmark, toggleImmersive]);
+  }, [currentChapter, chapters, loadChapter, setFontSize, setShowSidebar, setShowNotes, setSettingsOpen, settingsOpen, showNotes, showSidebar, currentBook, handleAddBookmark, toggleImmersive, tryTurnPage]);
 }

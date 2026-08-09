@@ -34,9 +34,11 @@ export function ComicReader() {
   const [isDragging, setIsDragging] = useState(false);
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
   const containerRef = useRef<HTMLDivElement>(null);
+  const webtoonRef = useRef<HTMLDivElement>(null);
   const imgElRef = useRef<HTMLImageElement>(null);
   // currentBook may be null while hooks run (see the early return below).
   const isWebtoon = currentBook?.reading_mode === "webtoon";
+  const webtoonScrollTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
   // Persist zoom
   useEffect(() => {
@@ -51,7 +53,12 @@ export function ComicReader() {
         try {
           const parsed = JSON.parse(content) as ComicPage[];
           setPages(parsed);
-          if (progress?.page_index && progress.page_index < parsed.length) {
+          // page_index === 0 is valid (cover / first page); do not treat as falsy
+          if (
+            progress?.page_index != null &&
+            progress.page_index >= 0 &&
+            progress.page_index < parsed.length
+          ) {
             setCurrentPage(progress.page_index);
           } else {
             setCurrentPage(0);
@@ -89,6 +96,42 @@ export function ComicReader() {
     },
     [pages, saveProgress]
   );
+
+  /** Webtoon: map vertical scroll to page_index and persist (throttled). */
+  const handleWebtoonScroll = useCallback(() => {
+    const el = webtoonRef.current;
+    if (!el || pages.length === 0 || !currentBook) return;
+    if (webtoonScrollTimer.current) clearTimeout(webtoonScrollTimer.current);
+    webtoonScrollTimer.current = setTimeout(() => {
+      const max = el.scrollHeight - el.clientHeight;
+      const ratio = max > 0 ? el.scrollTop / max : 0;
+      const pageIndex = Math.min(
+        pages.length - 1,
+        Math.max(0, Math.round(ratio * (pages.length - 1))),
+      );
+      setCurrentPage(pageIndex);
+      saveProgress(pageIndex);
+    }, 400);
+  }, [pages.length, currentBook, saveProgress]);
+
+  // Restore webtoon scroll once after pages for this chapter are ready
+  const webtoonRestoredFor = useRef<string | null>(null);
+  useEffect(() => {
+    if (!isWebtoon || loading || pages.length === 0 || !currentChapter) return;
+    const key = `${currentChapter.id}:${pages.length}`;
+    if (webtoonRestoredFor.current === key) return;
+    webtoonRestoredFor.current = key;
+    const el = webtoonRef.current;
+    if (!el) return;
+    // Wait a frame so images can affect scrollHeight
+    requestAnimationFrame(() => {
+      const max = el.scrollHeight - el.clientHeight;
+      if (max <= 0) return;
+      const idx = progress?.page_index ?? currentPage;
+      const ratio = pages.length > 1 ? Math.min(Math.max(idx, 0), pages.length - 1) / (pages.length - 1) : 0;
+      el.scrollTop = ratio * max;
+    });
+  }, [isWebtoon, loading, pages.length, currentChapter, progress?.page_index, currentPage]);
 
   const prevPage = useCallback(() => {
     if (doublePage && currentPage > 1) goToPage(currentPage - 2);
@@ -419,7 +462,11 @@ export function ComicReader() {
             </div>
           </div>
         ) : isWebtoon ? (
-          <div className="h-full overflow-y-auto">
+          <div
+            ref={webtoonRef}
+            className="h-full overflow-y-auto"
+            onScroll={handleWebtoonScroll}
+          >
             <div className="max-w-3xl mx-auto">
               {pages.map((page) => (
                 <img key={page.index} src={imgSrc(page.image_path)} alt={page.file_name}

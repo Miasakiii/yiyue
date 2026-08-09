@@ -147,6 +147,19 @@ export function SearchPanel({
 
   const handleResultClick = async (result: SearchResult) => {
     if (result.book_id) {
+      if (
+        (result.result_type === "content" || result.result_type === "annotation") &&
+        result.chapter_id &&
+        result.matched_text
+      ) {
+        sessionStorage.setItem(
+          "yiyue.pendingSearchJump",
+          JSON.stringify({
+            chapterId: result.chapter_id,
+            matchedText: result.matched_text,
+          }),
+        );
+      }
       await openBook(result.book_id);
       if (result.chapter_id) {
         await loadChapter(result.chapter_id);
