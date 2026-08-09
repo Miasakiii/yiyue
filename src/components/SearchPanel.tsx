@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { BookOpen, Clock, FileText, Search } from "lucide-react";
 import { invoke } from "@tauri-apps/api/core";
 import DOMPurify from "dompurify";
 import { useAppStore } from "../stores/app";
@@ -29,23 +30,13 @@ const SCOPE_OPTIONS = [
 
 const TYPE_ICONS: Record<string, React.ReactNode> = {
   book: (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-      <path d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
-    </svg>
+<BookOpen size={ 14 } strokeWidth={2} />
   ),
   content: (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-      <polyline points="14 2 14 8 20 8" />
-      <line x1="16" y1="13" x2="8" y2="13" />
-      <line x1="16" y1="17" x2="8" y2="17" />
-    </svg>
+<FileText size={ 14 } strokeWidth={2} />
   ),
   annotation: (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-      <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
-      <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
-    </svg>
+<FileText size={ 14 } strokeWidth={2} />
   ),
 };
 
@@ -209,20 +200,7 @@ export function SearchPanel({
           className="flex items-center gap-3 px-5 py-4"
           style={{ borderBottom: "1px solid var(--border)" }}
         >
-          <svg
-            className="w-5 h-5 flex-shrink-0"
-            style={{ color: "var(--text-tertiary)" }}
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-            />
-          </svg>
+<Search className="w-5 h-5 flex-shrink-0" style={{ color: "var(--text-tertiary)" }} />
           <input
             ref={inputRef}
             type="text"
@@ -325,10 +303,7 @@ export function SearchPanel({
               className="flex flex-col items-center justify-center py-16 gap-3"
               style={{ color: "var(--text-tertiary)" }}
             >
-              <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" opacity="0.4">
-                <circle cx="11" cy="11" r="8" />
-                <path d="M21 21l-4.35-4.35" />
-              </svg>
+<Search size={ 40 } strokeWidth={1.5} />
               <div className="text-sm">没有找到匹配的结果</div>
             </div>
           ) : (
@@ -347,10 +322,7 @@ export function SearchPanel({
                     style={{ color: "var(--text-secondary)" }}
                     onClick={() => handleHistoryClick(term)}
                   >
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ color: "var(--text-tertiary)" }}>
-                      <circle cx="12" cy="12" r="10" />
-                      <polyline points="12 6 12 12 16 14" />
-                    </svg>
+<Clock size={ 14 } strokeWidth={2} />
                     {term}
                   </button>
                 ))}

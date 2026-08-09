@@ -1,4 +1,5 @@
 import { THEMES } from "../../constants";
+import { Pause, Play, Square, X } from "lucide-react";
 import { FONT_FAMILIES, LINE_HEIGHT_PRESETS, CONTENT_WIDTH_PRESETS, PRESETS, type Preset } from "./constants";
 import { SettingRow, ChoiceBtn } from "./helpers";
 
@@ -72,9 +73,7 @@ export function ReaderSettings({
           style={{ color: "var(--text-tertiary)" }}
           onClick={onClose}
           title="关闭">
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
-          </svg>
+<X size={ 12 } strokeWidth={2} />
         </button>
       </div>
 
@@ -200,9 +199,7 @@ export function ReaderSettings({
                     style={{ color: "var(--accent)" }}
                     onClick={startTts}
                     title="开始朗读">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                      <polygon points="5 3 19 12 5 21 5 3" />
-                    </svg>
+<Play size={ 14 } strokeWidth={2} />
                   </button>
                 ) : (
                   <>
@@ -211,27 +208,21 @@ export function ReaderSettings({
                         style={{ color: "var(--accent)" }}
                         onClick={pauseTts}
                         title="暂停">
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                          <rect x="6" y="4" width="4" height="16" /><rect x="14" y="4" width="4" height="16" />
-                        </svg>
+<Pause size={ 14 } strokeWidth={2} />
                       </button>
                     ) : (
                       <button className="p-1 rounded-md hover-bg"
                         style={{ color: "var(--accent)" }}
                         onClick={resumeTts}
                         title="继续">
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                          <polygon points="5 3 19 12 5 21 5 3" />
-                        </svg>
+<Play size={ 14 } strokeWidth={2} />
                       </button>
                     )}
                     <button className="p-1 rounded-md hover-bg"
                       style={{ color: "var(--text-tertiary)" }}
                       onClick={stopTts}
                       title="停止">
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                        <rect x="4" y="4" width="16" height="16" rx="1" />
-                      </svg>
+<Square size={ 14 } strokeWidth={2} />
                     </button>
                   </>
                 )}

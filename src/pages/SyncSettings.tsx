@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { AlertCircle, Download, Eye, Globe, Info, RefreshCw, Upload } from "lucide-react";
 import { invoke } from "@tauri-apps/api/core";
 import { PageHeader, Button, Input, Switch } from "../components/ui";
 
@@ -112,9 +113,7 @@ export function SyncSettings() {
             }}
           >
             <h2 className="text-sm font-semibold mb-4 flex items-center gap-2">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="2">
-                <path d="M21 12a9 9 0 0 1-9 9m9-9a9 9 0 0 0-9-9m9 9H3m9 9a9 9 0 0 1-9-9m9 9c1.66 0 3-4.03 3-9s-1.34-9-3-9m0 18c-1.66 0-3-4.03-3-9s1.34-9 3-9" />
-              </svg>
+<Globe size={ 16 } strokeWidth={2} />
               同步状态
             </h2>
             <div className="grid grid-cols-2 gap-4 text-sm mb-5">
@@ -147,23 +146,17 @@ export function SyncSettings() {
                   </>
                 ) : (
                   <>
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                      <path d="M21 12a9 9 0 0 1-9 9m9-9a9 9 0 0 0-9-9m9 9H3m9 9a9 9 0 0 1-9-9m9 9c1.66 0 3-4.03 3-9s-1.34-9-3-9m0 18c-1.66 0-3-4.03-3-9s1.34-9 3-9" />
-                    </svg>
+<Globe size={ 14 } strokeWidth={2} />
                     立即同步
                   </>
                 )}
               </Button>
               <Button variant="secondary" onClick={() => handleSync("push")} disabled={syncing}>
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12" />
-                </svg>
+<Upload size={ 13 } strokeWidth={2} />
                 上传
               </Button>
               <Button variant="secondary" onClick={() => handleSync("pull")} disabled={syncing}>
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3" />
-                </svg>
+<Download size={ 13 } strokeWidth={2} />
                 下载
               </Button>
             </div>
@@ -174,16 +167,9 @@ export function SyncSettings() {
                 style={{ color: syncMessage.includes("失败") ? "var(--error)" : "var(--success)" }}
               >
                 {syncMessage.includes("失败") ? (
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <circle cx="12" cy="12" r="10" />
-                    <line x1="15" y1="9" x2="9" y2="15" />
-                    <line x1="9" y1="9" x2="15" y2="15" />
-                  </svg>
+<AlertCircle size={ 14 } strokeWidth={2} />
                 ) : (
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
-                    <polyline points="22 4 12 14.01 9 11.01" />
-                  </svg>
+<RefreshCw size={ 14 } strokeWidth={2} />
                 )}
                 {syncMessage}
               </div>
@@ -199,10 +185,7 @@ export function SyncSettings() {
             }}
           >
             <h2 className="text-sm font-semibold mb-4 flex items-center gap-2">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="2">
-                <circle cx="12" cy="12" r="3" />
-                <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" />
-              </svg>
+<Eye size={ 16 } strokeWidth={2} />
               WebDAV 配置
             </h2>
             <div className="space-y-4">
@@ -307,20 +290,13 @@ export function SyncSettings() {
                 </Button>
                 {testResult === "success" && (
                   <span className="text-sm flex items-center gap-1" style={{ color: "var(--success)" }}>
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                      <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
-                      <polyline points="22 4 12 14.01 9 11.01" />
-                    </svg>
+<RefreshCw size={ 14 } strokeWidth={2} />
                     连接成功
                   </span>
                 )}
                 {testResult === "error" && (
                   <span className="text-sm flex items-center gap-1" style={{ color: "var(--error)" }}>
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                      <circle cx="12" cy="12" r="10" />
-                      <line x1="15" y1="9" x2="9" y2="15" />
-                      <line x1="9" y1="9" x2="15" y2="15" />
-                    </svg>
+<AlertCircle size={ 14 } strokeWidth={2} />
                     {testError}
                   </span>
                 )}
@@ -337,11 +313,7 @@ export function SyncSettings() {
             }}
           >
             <h3 className="text-xs font-semibold mb-3 flex items-center gap-2" style={{ color: "var(--text-secondary)" }}>
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <circle cx="12" cy="12" r="10" />
-                <line x1="12" y1="16" x2="12" y2="12" />
-                <line x1="12" y1="8" x2="12.01" y2="8" />
-              </svg>
+<Info size={ 14 } strokeWidth={2} />
               支持的 WebDAV 服务
             </h3>
             <div className="grid grid-cols-2 gap-2">

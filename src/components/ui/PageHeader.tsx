@@ -1,4 +1,5 @@
 import { useNavigate } from "react-router-dom";
+import { ChevronLeft } from "lucide-react";
 import type { ReactNode } from "react";
 
 export interface PageHeaderProps {
@@ -23,9 +24,7 @@ export function PageHeader({ title, actions }: PageHeaderProps) {
           style={{ color: "var(--text-secondary)" }}
           onClick={() => navigate("/")}
         >
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <path d="M19 12H5M12 19l-7-7 7-7" />
-          </svg>
+<ChevronLeft size={ 14 } strokeWidth={2} />
           返回
         </button>
         <h1 className="text-lg font-semibold">{title}</h1>

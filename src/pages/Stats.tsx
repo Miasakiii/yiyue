@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { AlertCircle, Award, BookOpen, Clock, Zap } from "lucide-react";
 import { invoke } from "@tauri-apps/api/core";
 import { PageHeader, Button } from "../components/ui";
 
@@ -122,11 +123,7 @@ export function Stats() {
                 border: "1px solid var(--border-light)",
               }}
             >
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--error)" strokeWidth="2">
-                <circle cx="12" cy="12" r="10" />
-                <line x1="12" y1="8" x2="12" y2="12" />
-                <line x1="12" y1="16" x2="12.01" y2="16" />
-              </svg>
+<AlertCircle size={ 24 } style={{ stroke: "var(--error)" }} />
               <div className="text-sm" style={{ color: "var(--error)" }}>{error}</div>
               <Button variant="secondary" size="sm" onClick={loadData}>
                 重新加载
@@ -141,10 +138,7 @@ export function Stats() {
                 label="总阅读时长"
                 value={formatDuration(stats.total_duration_ms)}
                 icon={
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <circle cx="12" cy="12" r="10" />
-                    <polyline points="12 6 12 12 16 14" />
-                  </svg>
+<Clock size={ 20 } strokeWidth={2} />
                 }
                 color="var(--accent)"
               />
@@ -152,9 +146,7 @@ export function Stats() {
                 label="总阅读字数"
                 value={formatChars(stats.total_chars_read)}
                 icon={
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <path d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
-                  </svg>
+<BookOpen size={ 20 } strokeWidth={2} />
                 }
                 color="var(--success)"
               />
@@ -162,9 +154,7 @@ export function Stats() {
                 label="连续阅读"
                 value={`${stats.current_streak}天`}
                 icon={
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" />
-                  </svg>
+<Zap size={ 20 } strokeWidth={2} />
                 }
                 color="var(--warning)"
               />
@@ -172,10 +162,7 @@ export function Stats() {
                 label="最长连续"
                 value={`${stats.longest_streak}天`}
                 icon={
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <circle cx="12" cy="8" r="7" />
-                    <polyline points="8.21 13.89 7 23 12 20 17 23 15.79 13.88" />
-                  </svg>
+<Award size={ 20 } strokeWidth={2} />
                 }
                 color="color-mix(in srgb, var(--accent) 50%, var(--success))"
               />

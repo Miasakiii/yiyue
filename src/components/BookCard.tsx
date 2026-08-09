@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from "react";
+import { Book, BookOpen, Check, Folder, Star } from "lucide-react";
 import { convertFileSrc } from "@tauri-apps/api/core";
 import { useAppStore } from "../stores/app";
 import type { BookListItem, Tag, Group } from "../types";
@@ -31,9 +32,7 @@ const FORMAT_LABELS: Record<string, string> = {
 /** Uniform linear icon for groups (replaces per-group emoji). */
 function GroupIcon({ size = 13 }: { size?: number }) {
   return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-      <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
-    </svg>
+<Folder size={size} strokeWidth={2} />
   );
 }
 
@@ -208,9 +207,7 @@ export function BookCard({ book, viewMode }: BookCardProps) {
               style={{ color: book.starred ? "var(--warning)" : "var(--text-tertiary)" }}
               onClick={(e) => { e.stopPropagation(); toggleFavorite(book.id); }}
             >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill={book.starred ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2">
-                <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
-              </svg>
+<Star size={ 14 } fill={book.starred ? "currentColor" : "none"} />
             </button>
             <button
               className="p-1.5 rounded opacity-0 group-hover:opacity-100 transition-opacity"
@@ -221,10 +218,7 @@ export function BookCard({ book, viewMode }: BookCardProps) {
               onClick={handleDelete}
               title={showDeleteConfirm ? "确认删除" : "删除"}
             >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <polyline points="3 6 5 6 21 6" />
-                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
-              </svg>
+<Book size={ 14 } strokeWidth={2} />
             </button>
           </div>
         </div>
@@ -269,9 +263,7 @@ export function BookCard({ book, viewMode }: BookCardProps) {
                   border: `1px solid ${formatColor}20`,
                 }}
               >
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke={formatColor} strokeWidth="1.5">
-                  <path d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
-                </svg>
+<BookOpen size={ 24 } strokeWidth={1.5} />
               </div>
               <span
                 className="text-xs font-bold px-2.5 py-1 rounded"
@@ -297,9 +289,7 @@ export function BookCard({ book, viewMode }: BookCardProps) {
           )}
           {book.starred && (
             <div className="absolute top-2 left-2">
-              <svg width="16" height="16" viewBox="0 0 24 24" stroke="none" style={{ fill: "var(--warning)" }}>
-                <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
-              </svg>
+<Star size={ 16 } style={{ fill: "var(--warning)", stroke: "none" }} />
             </div>
           )}
           <button
@@ -312,10 +302,7 @@ export function BookCard({ book, viewMode }: BookCardProps) {
             onClick={handleDelete}
             title={showDeleteConfirm ? "确认删除" : "删除"}
           >
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <polyline points="3 6 5 6 21 6" />
-              <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
-            </svg>
+<Book size={ 13 } strokeWidth={2} />
           </button>
         </div>
 
@@ -444,9 +431,7 @@ function ContextMenu({
                 )}
                 <span className="flex-1 truncate">{item.name}</span>
                 {selected && (
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="2.5" className="flex-shrink-0">
-                    <polyline points="20 6 9 17 4 12" />
-                  </svg>
+<Check size={ 14 } style={{ stroke: "var(--accent)" }} />
                 )}
               </button>
             );

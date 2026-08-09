@@ -1,4 +1,5 @@
 import { useEffect, useRef } from "react";
+import { Bookmark as BookmarkIcon, Plus, X } from "lucide-react";
 import type { Chapter, Bookmark } from "../../types";
 
 interface ReaderSidebarProps {
@@ -64,10 +65,7 @@ export function ReaderSidebar({
             onClick={addBookmark}
             title="添加书签 (Ctrl+Shift+B)"
           >
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-              <line x1="12" y1="5" x2="12" y2="19" />
-              <line x1="5" y1="12" x2="19" y2="12" />
-            </svg>
+<Plus size={ 12 } strokeWidth={2.5} />
           </button>
         </div>
         <div className="overflow-y-auto flex-1">
@@ -87,9 +85,7 @@ export function ReaderSidebar({
                     onClick={() => jumpToBookmark(bm)}
                     title={bm.title || undefined}
                   >
-                    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ display: "inline-block", marginRight: 6, color: "var(--accent)", verticalAlign: -1 }}>
-                      <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z" />
-                    </svg>
+<BookmarkIcon size={10} strokeWidth={2} />
                     {bm.title || `${chIdx}. ${ch?.title || "未知章节"}`}
                   </button>
                   <button
@@ -98,10 +94,7 @@ export function ReaderSidebar({
                     onClick={() => deleteBookmark(bm.id)}
                     title="删除书签"
                   >
-                    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                      <line x1="18" y1="6" x2="6" y2="18" />
-                      <line x1="6" y1="6" x2="18" y2="18" />
-                    </svg>
+<X size={ 10 } strokeWidth={2} />
                   </button>
                 </div>
               );

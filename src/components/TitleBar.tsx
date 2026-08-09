@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { Copy, Minus, Square, X } from "lucide-react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 
 const appWindow = getCurrentWindow();
@@ -53,9 +54,7 @@ export function TitleBar() {
           onClick={() => appWindow.minimize()}
           title="最小化"
         >
-          <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.2">
-            <line x1="2" y1="6" x2="10" y2="6" />
-          </svg>
+<Minus size={ 12 } strokeWidth={1.2} />
         </button>
         <button
           type="button"
@@ -64,14 +63,9 @@ export function TitleBar() {
           title={isMaximized ? "还原" : "最大化"}
         >
           {isMaximized ? (
-            <svg width="11" height="11" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.2">
-              <rect x="2" y="4" width="6" height="6" rx="0.5" />
-              <path d="M4 4V2h6v6h-2" />
-            </svg>
+<Copy size={ 11 } strokeWidth={1.2} />
           ) : (
-            <svg width="11" height="11" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.2">
-              <rect x="2.5" y="2.5" width="7" height="7" rx="0.5" />
-            </svg>
+<Square size={ 11 } strokeWidth={1.2} />
           )}
         </button>
         <button
@@ -80,9 +74,7 @@ export function TitleBar() {
           onClick={() => appWindow.close()}
           title="关闭"
         >
-          <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.2">
-            <path d="M2.5 2.5l7 7M9.5 2.5l-7 7" />
-          </svg>
+<X size={ 12 } strokeWidth={1.2} />
         </button>
       </div>
     </div>

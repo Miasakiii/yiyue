@@ -1,4 +1,5 @@
 import { useEffect, useState, useRef, useCallback } from "react";
+import { ChevronLeft, ChevronRight, Columns2, Image, SeparatorVertical, ZoomIn, ZoomOut } from "lucide-react";
 import { invoke, convertFileSrc } from "@tauri-apps/api/core";
 import { useAppStore } from "../stores/app";
 import type { ComicPage } from "../types";
@@ -285,9 +286,7 @@ export function ComicReader() {
         <div className="flex items-center gap-2">
           <button className="px-2.5 py-1.5 rounded-lg text-sm flex items-center gap-1.5 hover-bg" style={{ color: "var(--text-secondary)" }}
             onClick={goBack}>
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M19 12H5M12 19l-7-7 7-7" />
-            </svg>
+<ChevronLeft size={ 14 } strokeWidth={2} />
             返回
           </button>
           <span className="text-sm truncate max-w-xs" style={{ color: "var(--text-secondary)" }}>{currentBook.title}</span>
@@ -316,9 +315,7 @@ export function ComicReader() {
               onClick={() => setDoublePage((v) => !v)}
               title="双页模式 (D)"
             >
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <rect x="2" y="3" width="8" height="18" rx="1" /><rect x="14" y="3" width="8" height="18" rx="1" />
-              </svg>
+<Columns2 size={ 16 } strokeWidth={2} />
             </button>
           )}
 
@@ -332,11 +329,7 @@ export function ComicReader() {
               onClick={() => setRtl((v) => !v)}
               title="右到左阅读 (R)"
             >
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M21 4v16" />
-                <path d="M16 12H6" />
-                <path d="M10 8l-4 4 4 4" />
-              </svg>
+<SeparatorVertical size={ 16 } strokeWidth={2} />
             </button>
           )}
 
@@ -349,9 +342,7 @@ export function ComicReader() {
                 style={{ color: "var(--text-tertiary)" }}
                 onClick={() => setZoom((z) => Math.min(ZOOM_MAX, z + 0.2))}
                 title="放大 (Ctrl+滚轮)">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" /><line x1="11" y1="8" x2="11" y2="14" /><line x1="8" y1="11" x2="14" y2="11" />
-                </svg>
+<ZoomIn size={ 16 } strokeWidth={2} />
               </button>
               <span className="text-xs tabular-nums px-1" style={{ color: "var(--text-tertiary)" }}>
                 {Math.round(zoom * 100)}%
@@ -360,9 +351,7 @@ export function ComicReader() {
                 style={{ color: "var(--text-tertiary)" }}
                 onClick={() => setZoom((z) => Math.max(ZOOM_MIN, z - 0.2))}
                 title="缩小">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" /><line x1="8" y1="11" x2="14" y2="11" />
-                </svg>
+<ZoomOut size={ 16 } strokeWidth={2} />
               </button>
               <button className="px-2 py-1.5 rounded-lg text-xs hover-bg"
                 style={{ color: zoom !== 1.0 ? "var(--accent)" : "var(--text-tertiary)" }}
@@ -378,9 +367,7 @@ export function ComicReader() {
           {/* Page nav */}
           <button className={`px-2 py-1.5 rounded-lg${currentPage > 0 ? " hover-bg" : ""}`} style={{ color: currentPage > 0 ? "var(--text-secondary)" : "var(--text-tertiary)" }}
             onClick={prevPage} disabled={currentPage === 0}>
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M15 18l-6-6 6-6" />
-            </svg>
+<ChevronRight size={ 16 } strokeWidth={2} />
           </button>
           <span className="text-xs tabular-nums px-2" style={{ color: "var(--text-tertiary)" }}>
             {doublePage && currentPage < pages.length - 1
@@ -389,9 +376,7 @@ export function ComicReader() {
           </span>
           <button className={`px-2 py-1.5 rounded-lg${currentPage < pages.length - 1 ? " hover-bg" : ""}`} style={{ color: currentPage < pages.length - 1 ? "var(--text-secondary)" : "var(--text-tertiary)" }}
             onClick={nextPage} disabled={currentPage === pages.length - 1}>
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M9 18l6-6-6-6" />
-            </svg>
+<ChevronLeft size={ 16 } strokeWidth={2} />
           </button>
         </div>
       </header>
@@ -408,11 +393,7 @@ export function ComicReader() {
         ) : pages.length === 0 ? (
           <div className="flex items-center justify-center h-full">
             <div className="flex flex-col items-center gap-3">
-              <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="var(--text-tertiary)" strokeWidth="1.5" opacity="0.4">
-                <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
-                <circle cx="8.5" cy="8.5" r="1.5" />
-                <polyline points="21 15 16 10 5 21" />
-              </svg>
+<Image size={ 40 } strokeWidth={1.5} />
               <div className="text-sm" style={{ color: "var(--text-tertiary)" }}>未找到图片</div>
             </div>
           </div>
@@ -473,17 +454,13 @@ export function ComicReader() {
             <div className="absolute left-0 top-0 w-1/4 h-full cursor-pointer group" onClick={rtlPrev}>
               <div className="absolute left-4 top-1/2 -translate-y-1/2 rounded-full p-2 opacity-0 group-hover:opacity-100 transition-opacity"
                 style={{ background: "var(--bg-elevated)", color: "var(--text-tertiary)", border: "1px solid var(--border)", boxShadow: "var(--shadow-md)" }}>
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <path d="M15 18l-6-6 6-6" />
-                </svg>
+<ChevronLeft size={ 20 } strokeWidth={2} />
               </div>
             </div>
             <div className="absolute right-0 top-0 w-1/4 h-full cursor-pointer group" onClick={rtlNext}>
               <div className="absolute right-4 top-1/2 -translate-y-1/2 rounded-full p-2 opacity-0 group-hover:opacity-100 transition-opacity"
                 style={{ background: "var(--bg-elevated)", color: "var(--text-tertiary)", border: "1px solid var(--border)", boxShadow: "var(--shadow-md)" }}>
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <path d="M9 18l6-6-6-6" />
-                </svg>
+<ChevronRight size={ 20 } strokeWidth={2} />
               </div>
             </div>
           </>

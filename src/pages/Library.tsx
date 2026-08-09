@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import { BarChart3, Book, BookOpen, ChevronDown, ChevronLeft, FileText, Folder, Globe, LayoutGrid, List, Moon, Plus, Radio, Search, Star, Sun, Upload, X } from "lucide-react";
 import type { ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAppStore } from "../stores/app";
@@ -27,47 +28,35 @@ const MORE_MENU: { label: string; path: string; icon: ReactNode }[] = [
     label: "统计",
     path: "/stats",
     icon: (
-      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-        <path d="M18 20V10M12 20V4M6 20v-6" />
-      </svg>
+<BarChart3 size={ 13 } strokeWidth={2} />
     ),
   },
   {
     label: "同步",
     path: "/sync",
     icon: (
-      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-        <path d="M21 12a9 9 0 0 1-9 9m9-9a9 9 0 0 0-9-9m9 9H3m9 9a9 9 0 0 1-9-9m9 9c1.66 0 3-4.03 3-9s-1.34-9-3-9m0 18c-1.66 0-3-4.03-3-9s1.34-9 3-9" />
-      </svg>
+<Globe size={ 13 } strokeWidth={2} />
     ),
   },
   {
     label: "规则",
     path: "/rules",
     icon: (
-      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-        <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
-        <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
-      </svg>
+<Book size={ 13 } strokeWidth={2} />
     ),
   },
   {
     label: "OPDS",
     path: "/opds",
     icon: (
-      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-        <path d="M4 11a9 9 0 0 1 9 9M4 4a16 16 0 0 1 16 16" />
-        <circle cx="5" cy="19" r="1" />
-      </svg>
+<Radio size={ 13 } strokeWidth={2} />
     ),
   },
   {
     label: "传输",
     path: "/transfer",
     icon: (
-      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12" />
-      </svg>
+<Upload size={ 13 } strokeWidth={2} />
     ),
   },
 ];
@@ -75,9 +64,7 @@ const MORE_MENU: { label: string; path: string; icon: ReactNode }[] = [
 /** Uniform linear icon for groups (replaces per-group emoji). */
 function GroupIcon({ size = 15 }: { size?: number }) {
   return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-      <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
-    </svg>
+<Folder size={size} strokeWidth={2} />
   );
 }
 
@@ -336,11 +323,7 @@ export function Library() {
               boxShadow: "var(--shadow-xl)",
             }}
           >
-            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="1.5">
-              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-              <polyline points="17 8 12 3 7 8" />
-              <line x1="12" y1="3" x2="12" y2="15" />
-            </svg>
+<Upload size={ 48 } strokeWidth={1.5} />
             <div className="text-base font-medium">释放鼠标以导入</div>
             <div className="text-xs" style={{ color: "var(--text-tertiary)" }}>
               支持 TXT / EPUB / PDF / MD / CBZ / DOCX
@@ -401,13 +384,7 @@ export function Library() {
             onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
             title={sidebarCollapsed ? "展开侧边栏" : "折叠侧边栏"}
           >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              {sidebarCollapsed ? (
-                <path d="M9 18l6-6-6-6" />
-              ) : (
-                <path d="M15 18l-6-6 6-6" />
-              )}
-            </svg>
+<ChevronLeft size={ 14 } strokeWidth={2} />
           </button>
         </div>
 
@@ -415,18 +392,13 @@ export function Library() {
           <div className="flex-1 overflow-y-auto py-2 flex flex-col items-center gap-1">
             {/* Collapsed icon shortcuts */}
             <SidebarIcon
-              icon={<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
-                <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
-              </svg>}
+icon={<Book size={16} strokeWidth={2} />}
               label="全部书籍"
               active={!hasActiveFilter}
               onClick={clearFilter}
             />
             <SidebarIcon
-              icon={<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
-              </svg>}
+icon={<Star size={16} strokeWidth={2} />}
               label="收藏"
               active={starredOnly}
               onClick={showStarred}
@@ -460,10 +432,7 @@ export function Library() {
             <div className="mb-4">
               <SidebarItem
                 icon={
-                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
-                    <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
-                  </svg>
+<Book size={ 15 } strokeWidth={2} />
                 }
                 label="全部书籍"
                 active={!hasActiveFilter}
@@ -471,9 +440,7 @@ export function Library() {
               />
               <SidebarItem
                 icon={
-                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
-                  </svg>
+<Star size={ 15 } strokeWidth={2} />
                 }
                 label="收藏"
                 active={starredOnly}
@@ -493,10 +460,7 @@ export function Library() {
                   onClick={() => setShowTagDialog(true)}
                   title="新建标签"
                 >
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                    <line x1="12" y1="5" x2="12" y2="19" />
-                    <line x1="5" y1="12" x2="19" y2="12" />
-                  </svg>
+<Plus size={ 12 } strokeWidth={2.5} />
                 </button>
               </div>
               {tags.length === 0 ? (
@@ -534,10 +498,7 @@ export function Library() {
                   onClick={() => setShowGroupDialog(true)}
                   title="新建分组"
                 >
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                    <line x1="12" y1="5" x2="12" y2="19" />
-                    <line x1="5" y1="12" x2="19" y2="12" />
-                  </svg>
+<Plus size={ 12 } strokeWidth={2.5} />
                 </button>
               </div>
               {groups.length === 0 ? (
@@ -604,10 +565,7 @@ export function Library() {
                 {starredOnly && "收藏"}
                 {activeTag && `标签: ${activeTag}`}
                 {activeGroup && `分组: ${groups.find((g) => g.id === activeGroup)?.name || activeGroup}`}
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                  <line x1="18" y1="6" x2="6" y2="18" />
-                  <line x1="6" y1="6" x2="18" y2="18" />
-                </svg>
+<X size={ 12 } strokeWidth={2.5} />
               </button>
             )}
           </div>
@@ -645,12 +603,7 @@ export function Library() {
                 onClick={() => setViewMode("grid")}
                 title="网格视图"
               >
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <rect x="3" y="3" width="7" height="7" rx="1" />
-                  <rect x="14" y="3" width="7" height="7" rx="1" />
-                  <rect x="3" y="14" width="7" height="7" rx="1" />
-                  <rect x="14" y="14" width="7" height="7" rx="1" />
-                </svg>
+<LayoutGrid size={ 14 } strokeWidth={2} />
               </button>
               <button
                 className="px-2.5 py-1.5 text-xs transition-all"
@@ -661,11 +614,7 @@ export function Library() {
                 onClick={() => setViewMode("list")}
                 title="列表视图"
               >
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <line x1="3" y1="6" x2="21" y2="6" />
-                  <line x1="3" y1="12" x2="21" y2="12" />
-                  <line x1="3" y1="18" x2="21" y2="18" />
-                </svg>
+<List size={ 14 } strokeWidth={2} />
               </button>
             </div>
 
@@ -685,21 +634,11 @@ export function Library() {
                   onClick={() => setTheme(t.key)}
                 >
                   {t.key === "light" ? (
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                      <circle cx="12" cy="12" r="4" />
-                      <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41" />
-                    </svg>
+<Sun size={ 14 } strokeWidth={2} />
                   ) : t.key === "dark" ? (
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                      <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
-                    </svg>
+<Moon size={ 14 } strokeWidth={2} />
                   ) : (
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-                      <polyline points="14 2 14 8 20 8" />
-                      <line x1="8" y1="13" x2="16" y2="13" />
-                      <line x1="8" y1="17" x2="13" y2="17" />
-                    </svg>
+<FileText size={ 14 } strokeWidth={2} />
                   )}
                 </button>
               ))}
@@ -709,20 +648,7 @@ export function Library() {
             <div className="relative" ref={moreRef}>
               <Button variant="secondary" size="sm" onClick={() => setShowMoreMenu((v) => !v)}>
                 更多
-                <svg
-                  width="12"
-                  height="12"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  style={{
-                    transform: showMoreMenu ? "rotate(180deg)" : "none",
-                    transition: "transform var(--transition-fast)",
-                  }}
-                >
-                  <polyline points="6 9 12 15 18 9" />
-                </svg>
+<ChevronDown size={12} strokeWidth={2} style={{ transform: showMoreMenu ? "rotate(180deg)" : "none", transition: "transform var(--transition-fast)" }} />
               </Button>
               {showMoreMenu && (
                 <div
@@ -755,10 +681,7 @@ export function Library() {
 
             {/* Import button */}
             <Button size="sm" onClick={handleImport}>
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                <line x1="12" y1="5" x2="12" y2="19" />
-                <line x1="5" y1="12" x2="19" y2="12" />
-              </svg>
+<Plus size={ 13 } strokeWidth={2.5} />
               导入
             </Button>
           </div>
@@ -777,20 +700,13 @@ export function Library() {
               }}
             >
               <div className="flex items-center gap-2">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <circle cx="12" cy="12" r="10" />
-                  <line x1="15" y1="9" x2="9" y2="15" />
-                  <line x1="9" y1="9" x2="15" y2="15" />
-                </svg>
+<Search size={ 14 } strokeWidth={2} />
                 <span>{importError}</span>
                 <button
                   className="ml-2 p-0.5 rounded hover:opacity-70"
                   onClick={() => setImportError(null)}
                 >
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <line x1="18" y1="6" x2="6" y2="18" />
-                    <line x1="6" y1="6" x2="18" y2="18" />
-                  </svg>
+<X size={ 12 } strokeWidth={2} />
                 </button>
               </div>
             </div>
@@ -817,9 +733,7 @@ export function Library() {
                   border: "2px dashed var(--border)",
                 }}
               >
-                <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="1.5">
-                  <path d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
-                </svg>
+<BookOpen size={ 36 } strokeWidth={1.5} />
               </div>
               <div className="text-center">
                 <div className="text-base font-medium mb-1">
@@ -1017,10 +931,7 @@ function SidebarItem({
           }}
           title="删除"
         >
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <line x1="18" y1="6" x2="6" y2="18" />
-            <line x1="6" y1="6" x2="18" y2="18" />
-          </svg>
+<X size={ 12 } strokeWidth={2} />
         </button>
       )}
     </div>

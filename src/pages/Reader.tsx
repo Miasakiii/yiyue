@@ -1,4 +1,5 @@
 import { useEffect, useState, useRef, useCallback, useMemo } from "react";
+import { BookOpen, ChevronDown, ChevronLeft, ChevronRight, FilePenLine, List, Pause, Play, Settings } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { invoke } from "@tauri-apps/api/core";
 import DOMPurify from "dompurify";
@@ -480,9 +481,7 @@ export function Reader() {
     return (
       <div className="flex items-center justify-center h-full" style={{ background: "var(--bg-primary)", color: "var(--text-primary)" }}>
         <div className="flex flex-col items-center gap-4">
-          <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="var(--text-tertiary)" strokeWidth="1.5">
-            <path d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
-          </svg>
+<BookOpen size={ 40 } strokeWidth={1.5} />
           <div className="text-sm" style={{ color: "var(--text-tertiary)" }}>无法加载章节内容</div>
           <button className="px-4 py-1.5 text-xs rounded-lg text-white" style={{ background: "var(--accent)" }}
             onClick={closeBook}>
@@ -518,13 +517,13 @@ export function Reader() {
           style={{ borderBottom: "1px solid var(--border)", background: "var(--bg-elevated)" }}>
           <div className="flex items-center gap-1">
             <ToolbarBtn onClick={goBack} title="返回">
-              <path d="M19 12H5M12 19l-7-7 7-7" />
+              <ChevronLeft size={14} strokeWidth={2} />
             </ToolbarBtn>
             <ToolbarBtn active={showSidebar} onClick={() => setShowSidebar(!showSidebar)} title="目录">
-              <><line x1="3" y1="6" x2="21" y2="6" /><line x1="3" y1="12" x2="15" y2="12" /><line x1="3" y1="18" x2="21" y2="18" /></>
+              <List size={14} strokeWidth={2} />
             </ToolbarBtn>
             <ToolbarBtn active={showNotes} onClick={() => setShowNotes(!showNotes)} title="笔记">
-              <><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" /><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" /></>
+              <FilePenLine size={14} strokeWidth={2} />
             </ToolbarBtn>
           </div>
 
@@ -539,16 +538,16 @@ export function Reader() {
               onClick={() => (isSpeaking ? (isPaused ? resumeTts() : pauseTts()) : startTts())}
               title={isSpeaking ? (isPaused ? "继续" : "暂停") : "朗读"}>
               {isSpeaking && !isPaused ? (
-                <><rect x="6" y="4" width="4" height="16" /><rect x="14" y="4" width="4" height="16" /></>
+                <Pause size={14} strokeWidth={2} />
               ) : (
-                <polygon points="5 3 19 12 5 21 5 3" />
+                <Play size={14} strokeWidth={2} />
               )}
             </ToolbarBtn>
 
             {/* Settings button */}
             <div className="relative" ref={settingsRef}>
               <ToolbarBtn active={settingsOpen} onClick={() => setSettingsOpen(!settingsOpen)} title="设置">
-                <><circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2 2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-.33-1.82l-.06.06a2 2 0 0 1 0-2.83 2 2 0 0 1-2.83 0l-.06.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2 2 2 2 0 0 1 2 2h.09a1.65 1.65 0 0 0-1.51 1z" /></>
+                <Settings size={14} strokeWidth={2} />
               </ToolbarBtn>
 
               {/* Settings Popover */}
@@ -593,9 +592,7 @@ export function Reader() {
                   </option>
                 ))}
               </select>
-              <svg className="absolute right-1.5 top-1/2 -translate-y-1/2 pointer-events-none" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="var(--text-tertiary)" strokeWidth="2">
-                <path d="M6 9l6 6 6-6" />
-              </svg>
+<ChevronDown size={ 10 } strokeWidth={2} />
             </div>
           </div>
         </header>
@@ -651,9 +648,7 @@ export function Reader() {
               onClick={() => loadChapter(chapters[chapterIndex - 1].id)}
               title="上一章"
             >
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M15 18l-6-6 6-6" />
-              </svg>
+<ChevronRight size={ 18 } strokeWidth={2} />
             </button>
           </div>
         )}
@@ -672,9 +667,7 @@ export function Reader() {
               onClick={() => loadChapter(chapters[chapterIndex + 1].id)}
               title="下一章"
             >
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M9 18l6-6-6-6" />
-              </svg>
+<ChevronLeft size={ 18 } strokeWidth={2} />
             </button>
           </div>
         )}
