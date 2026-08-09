@@ -1,4 +1,5 @@
-﻿use crate::commands::search as search_cmd;
+use crate::commands::search as search_cmd;
+use crate::error::{AppError, AppResult};
 use crate::db::DbConn;
 use crate::models::*;
 use crate::parser::{self, ParseOptions};
@@ -16,18 +17,18 @@ pub struct ImportResult {
     pub warnings: Vec<String>,
 }
 
-fn get_library_dir(app: &AppHandle) -> Result<PathBuf, String> {
+fn get_library_dir(app: &AppHandle) -> AppResult<PathBuf> {
     let data_dir = app
         .path()
         .app_data_dir()
-        .map_err(|_| "Failed to resolve app data dir".to_string())?;
+        .map_err(|_| AppError::Internal("Failed to resolve app data dir".to_string()))?;
     let library = data_dir.join("library");
-    fs::create_dir_all(&library).map_err(|e| e.to_string())?;
+    fs::create_dir_all(&library)?;
     Ok(library)
 }
 
-fn compute_hash(path: &Path) -> Result<String, String> {
-    let data = fs::read(path).map_err(|e| e.to_string())?;
+fn compute_hash(path: &Path) -> AppResult<String> {
+    let data = fs::read(path)?;
     let hash = blake3::hash(&data);
     Ok(hash.to_hex().to_string())
 }
@@ -56,14 +57,14 @@ pub async fn import_book(
     db: State<'_, DbConn>,
     file_path: String,
     encoding: Option<String>,
-) -> Result<ImportResult, String> {
+) -> AppResult<ImportResult> {
     let path = Path::new(&file_path).to_path_buf();
     if !path.exists() {
-        return Err("File not found".to_string());
+        return Err(AppError::NotFound("File not found".to_string()));
     }
 
     let format = get_format(&path);
-    let file_size = fs::metadata(&path).map_err(|e| e.to_string())?.len() as i64;
+    let file_size = fs::metadata(&path)?.len() as i64;
 
     // Check for duplicates (quick DB read — hold lock briefly)
     let file_hash = compute_hash(&path)?;
@@ -75,11 +76,11 @@ pub async fn import_book(
                 params![file_hash],
                 |row| row.get::<_, i64>(0),
             )
-            .map_err(|e| e.to_string())?
+            ?
             > 0;
 
         if exists {
-            return Err("Book already imported".to_string());
+            return Err(AppError::InvalidInput("Book already imported".to_string()));
         }
 
         // If soft-deleted, permanently remove it so we can re-import
@@ -87,14 +88,14 @@ pub async fn import_book(
             "DELETE FROM books WHERE file_hash = ?1 AND deleted_at IS NOT NULL",
             params![file_hash],
         )
-        .map_err(|e| e.to_string())?;
+        ?;
     } // DB lock released
 
     // Copy file to library
     let library_dir = get_library_dir(&app)?;
     let bucket = &file_hash[..2];
     let bucket_dir = library_dir.join(bucket);
-    fs::create_dir_all(&bucket_dir).map_err(|e| e.to_string())?;
+    fs::create_dir_all(&bucket_dir)?;
 
     let ext = path
         .extension()
@@ -102,7 +103,7 @@ pub async fn import_book(
         .unwrap_or("bin");
     let dest_name = format!("{}.{}", file_hash, ext);
     let dest_path = bucket_dir.join(&dest_name);
-    fs::copy(&path, &dest_path).map_err(|e| e.to_string())?;
+    fs::copy(&path, &dest_path)?;
 
     let relative_path = format!("{}/{}", bucket, dest_name);
 
@@ -110,7 +111,7 @@ pub async fn import_book(
     // starve the tokio async runtime (this is what caused the UI to freeze).
     let comic_cache_dir = library_dir.join("comic_cache");
     let format_for_parse = format.clone();
-    let parsed = tokio::task::spawn_blocking(move || -> Result<ParsedImport, String> {
+    let parsed = tokio::task::spawn_blocking(move || -> AppResult<ParsedImport> {
         let format = format_for_parse;
         match format.as_str() {
             "txt" => {
@@ -118,7 +119,7 @@ pub async fn import_book(
                     encoding,
                     chapter_pattern: None,
                 };
-                let mut parsed = parser::txt::parse(&path, &opts).map_err(|e| e.to_string())?;
+                let mut parsed = parser::txt::parse(&path, &opts)?;
 
                 // Apply preset rules (web novel noise filtering)
                 let preset = rules::presets::web_novel_cleaner();
@@ -140,7 +141,7 @@ pub async fn import_book(
                     encoding: None,
                     chapter_pattern: None,
                 };
-                let parsed = parser::epub::parse(&path, &opts).map_err(|e| e.to_string())?;
+                let parsed = parser::epub::parse(&path, &opts)?;
                 Ok(ParsedImport::Novel {
                     metadata: parsed.metadata,
                     chapters: parsed.chapters,
@@ -151,7 +152,7 @@ pub async fn import_book(
                     encoding: None,
                     chapter_pattern: None,
                 };
-                let parsed = parser::pdf::parse(&path, &opts).map_err(|e| e.to_string())?;
+                let parsed = parser::pdf::parse(&path, &opts)?;
                 Ok(ParsedImport::Novel {
                     metadata: parsed.metadata,
                     chapters: parsed.chapters,
@@ -162,7 +163,7 @@ pub async fn import_book(
                     encoding: None,
                     chapter_pattern: None,
                 };
-                let parsed = parser::markdown::parse(&path, &opts).map_err(|e| e.to_string())?;
+                let parsed = parser::markdown::parse(&path, &opts)?;
                 Ok(ParsedImport::Novel {
                     metadata: parsed.metadata,
                     chapters: parsed.chapters,
@@ -173,7 +174,7 @@ pub async fn import_book(
                     encoding: None,
                     chapter_pattern: None,
                 };
-                let parsed = parser::docx::parse(&path, &opts).map_err(|e| e.to_string())?;
+                let parsed = parser::docx::parse(&path, &opts)?;
                 Ok(ParsedImport::Novel {
                     metadata: parsed.metadata,
                     chapters: parsed.chapters,
@@ -181,19 +182,19 @@ pub async fn import_book(
             }
             "cbz" => {
                 let comic = parser::comic::parse_cbz(&path, &comic_cache_dir)
-                    .map_err(|e| e.to_string())?;
+                    ?;
                 Ok(ParsedImport::Comic { comic })
             }
             "cbr" => {
                 let comic = parser::comic::parse_cbr(&path, &comic_cache_dir)
-                    .map_err(|e| e.to_string())?;
+                    ?;
                 Ok(ParsedImport::Comic { comic })
             }
-            _ => Err(format!("Unsupported format: {}", format)),
+            _ => Err(AppError::InvalidInput(format!("Unsupported format: {}", format))),
         }
     })
     .await
-    .map_err(|e| format!("Parse task failed: {}", e))??;
+    .map_err(|e| AppError::Internal(format!("Parse task failed: {}", e)))??;
 
     let book_id = Uuid::new_v4().to_string();
     let now = chrono::Utc::now().to_rfc3339();
@@ -222,7 +223,7 @@ pub async fn import_book(
                         metadata.total_chars as i64,
                     ],
                 )
-                .map_err(|e| e.to_string())?;
+                ?;
 
                 // Insert chapters and index in one pass
                 for (i, ch) in chapters.iter().enumerate() {
@@ -242,7 +243,7 @@ pub async fn import_book(
                             ch.content,
                         ],
                     )
-                    .map_err(|e| e.to_string())?;
+                    ?;
 
                     // Index into FTS5 immediately — avoids a second query loop
                     search_cmd::index_chapter(
@@ -265,14 +266,14 @@ pub async fn import_book(
                         metadata.author.as_deref().map(|a| search::tokenize(a)).unwrap_or_default(),
                     ],
                 )
-                .map_err(|e| e.to_string())?;
+                ?;
 
                 // Store pinyin for book title search
                 conn.execute(
                     "UPDATE books SET pinyin_title = ?1 WHERE id = ?2",
                     params![book_pinyin_title, book_id],
                 )
-                .map_err(|e| e.to_string())?;
+                ?;
 
                 Book {
                     id: book_id,
@@ -315,7 +316,7 @@ pub async fn import_book(
                         comic.metadata.reading_mode,
                     ],
                 )
-                .map_err(|e| e.to_string())?;
+                ?;
 
                 // Insert comic chapters with page data as content
                 for (i, ch) in comic.chapters.iter().enumerate() {
@@ -326,7 +327,7 @@ pub async fn import_book(
                          VALUES (?1, ?2, ?3, 1, ?4, ?5)",
                         params![chapter_id, book_id, ch.title, i as i64, pages_json],
                     )
-                    .map_err(|e| e.to_string())?;
+                    ?;
                 }
 
                 // Update FTS index
@@ -335,7 +336,7 @@ pub async fn import_book(
                      SELECT rowid, ?2, ?3, description FROM books WHERE id = ?1",
                     params![book_id, search::tokenize(&comic.metadata.title), ""],
                 )
-                .map_err(|e| e.to_string())?;
+                ?;
 
                 Book {
                     id: book_id,
@@ -371,15 +372,15 @@ pub async fn import_folder(
     app: AppHandle,
     db: State<'_, DbConn>,
     folder_path: String,
-) -> Result<ImportResult, String> {
+) -> AppResult<ImportResult> {
     let path = Path::new(&folder_path);
     if !path.exists() || !path.is_dir() {
-        return Err("Folder not found".to_string());
+        return Err(AppError::NotFound("Folder not found".to_string()));
     }
 
     let library_dir = get_library_dir(&app)?;
     let cache_dir = library_dir.join("comic_cache");
-    let comic = parser::comic::parse_folder(path, &cache_dir).map_err(|e| e.to_string())?;
+    let comic = parser::comic::parse_folder(path, &cache_dir)?;
 
     // Generate a hash from folder path
     let file_hash = blake3::hash(folder_path.as_bytes()).to_hex().to_string();
@@ -393,11 +394,11 @@ pub async fn import_folder(
                 params![file_hash],
                 |row| row.get::<_, i64>(0),
             )
-            .map_err(|e| e.to_string())?
+            ?
             > 0;
 
         if exists {
-            return Err("Folder already imported".to_string());
+            return Err(AppError::InvalidInput("Folder already imported".to_string()));
         }
 
         // If soft-deleted, permanently remove it so we can re-import
@@ -405,7 +406,7 @@ pub async fn import_folder(
             "DELETE FROM books WHERE file_hash = ?1 AND deleted_at IS NOT NULL",
             params![file_hash],
         )
-        .map_err(|e| e.to_string())?;
+        ?;
     }
 
     let book_id = Uuid::new_v4().to_string();
@@ -431,7 +432,7 @@ pub async fn import_folder(
                 comic.metadata.reading_mode,
             ],
         )
-        .map_err(|e| e.to_string())?;
+        ?;
 
         for (i, ch) in comic.chapters.iter().enumerate() {
             let chapter_id = Uuid::new_v4().to_string();
@@ -441,7 +442,7 @@ pub async fn import_folder(
                  VALUES (?1, ?2, ?3, 1, ?4, ?5)",
                 params![chapter_id, book_id, ch.title, i as i64, pages_json],
             )
-            .map_err(|e| e.to_string())?;
+            ?;
         }
 
         conn.execute(
@@ -449,7 +450,7 @@ pub async fn import_folder(
              SELECT rowid, ?2, ?3, description FROM books WHERE id = ?1",
             params![book_id, search::tokenize(&comic.metadata.title), ""],
         )
-        .map_err(|e| e.to_string())?;
+        ?;
     }
 
     let book = Book {

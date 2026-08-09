@@ -8,11 +8,20 @@ pub enum AppError {
     #[error("Database error: {0}")]
     Database(#[from] crate::db::DbError),
 
+    #[error("Database error: {0}")]
+    Sqlite(#[from] rusqlite::Error),
+
     #[error("Parse error: {0}")]
     Parse(String),
 
+    #[error("Parser error: {0}")]
+    Parser(#[from] crate::parser::ParseError),
+
     #[error("IO error: {0}")]
-    Io(String),
+    Io(#[from] std::io::Error),
+
+    #[error("JSON error: {0}")]
+    Json(#[from] serde_json::Error),
 
     #[error("Network error: {0}")]
     Network(String),

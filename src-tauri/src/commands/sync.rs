@@ -1,4 +1,5 @@
-﻿use crate::db::DbConn;
+use crate::db::DbConn;
+use crate::error::{AppError, AppResult};
 use crate::sync::{SyncStatus, WebDavClient, WebDavConfig};
 use rusqlite::params;
 use serde::{Deserialize, Serialize};
@@ -16,7 +17,7 @@ pub struct SyncPayload {
 
 /// Get WebDAV config from settings. Password is fetched from the OS keyring.
 #[tauri::command]
-pub fn get_webdav_config(db: State<'_, DbConn>) -> Result<WebDavConfig, String> {
+pub fn get_webdav_config(db: State<'_, DbConn>) -> AppResult<WebDavConfig> {
     let conn = db.conn.lock();
 
     let config_json: Option<String> = conn
@@ -28,7 +29,7 @@ pub fn get_webdav_config(db: State<'_, DbConn>) -> Result<WebDavConfig, String> 
         .ok();
 
     let mut config = if let Some(json) = config_json {
-        serde_json::from_str::<WebDavConfig>(&json).map_err(|e| e.to_string())?
+        serde_json::from_str::<WebDavConfig>(&json)?
     } else {
         WebDavConfig::default()
     };
@@ -45,7 +46,7 @@ pub fn get_webdav_config(db: State<'_, DbConn>) -> Result<WebDavConfig, String> 
 /// Save WebDAV config to settings. Password is stored in the OS keyring,
 /// never written to the database in plaintext.
 #[tauri::command]
-pub fn save_webdav_config(db: State<'_, DbConn>, config: WebDavConfig) -> Result<(), String> {
+pub fn save_webdav_config(db: State<'_, DbConn>, config: WebDavConfig) -> AppResult<()> {
     let conn = db.conn.lock();
 
     // Store password in OS keyring. If the password field is empty, treat it
@@ -59,27 +60,27 @@ pub fn save_webdav_config(db: State<'_, DbConn>, config: WebDavConfig) -> Result
     }
 
     // Serialize WITHOUT password (skipped via #[serde(skip)])
-    let json = serde_json::to_string(&config).map_err(|e| e.to_string())?;
+    let json = serde_json::to_string(&config)?;
 
     conn.execute(
         "INSERT OR REPLACE INTO settings (key, value) VALUES ('webdav_config', ?1)",
         params![json],
     )
-    .map_err(|e| e.to_string())?;
+    ?;
 
     Ok(())
 }
 
 /// Test WebDAV connection.
 #[tauri::command]
-pub fn test_webdav_connection(config: WebDavConfig) -> Result<(), String> {
+pub fn test_webdav_connection(config: WebDavConfig) -> AppResult<()> {
     let client = WebDavClient::new(config);
     client.test_connection()
 }
 
 /// Push local changes to WebDAV server.
 #[tauri::command]
-pub fn sync_push(db: State<'_, DbConn>) -> Result<SyncStatus, String> {
+pub fn sync_push(db: State<'_, DbConn>) -> AppResult<SyncStatus> {
     let config = get_webdav_config_inner(&db)?;
     let client = WebDavClient::new(config);
 
@@ -90,7 +91,7 @@ pub fn sync_push(db: State<'_, DbConn>) -> Result<SyncStatus, String> {
     let payload = export_sync_data(&db)?;
 
     // Upload sync file
-    let json = serde_json::to_string_pretty(&payload).map_err(|e| e.to_string())?;
+    let json = serde_json::to_string_pretty(&payload)?;
     client.put("sync_data.json", json.as_bytes())?;
 
     // Update sync log
@@ -99,7 +100,7 @@ pub fn sync_push(db: State<'_, DbConn>) -> Result<SyncStatus, String> {
         "UPDATE sync_log SET synced = 1 WHERE synced = 0",
         [],
     )
-    .map_err(|e| e.to_string())?;
+    ?;
 
     // Update last sync time
     let now = chrono::Utc::now().to_rfc3339();
@@ -107,7 +108,7 @@ pub fn sync_push(db: State<'_, DbConn>) -> Result<SyncStatus, String> {
         "INSERT OR REPLACE INTO settings (key, value) VALUES ('last_sync', ?1)",
         params![now],
     )
-    .map_err(|e| e.to_string())?;
+    ?;
 
     Ok(SyncStatus {
         last_sync: Some(now),
@@ -119,13 +120,13 @@ pub fn sync_push(db: State<'_, DbConn>) -> Result<SyncStatus, String> {
 
 /// Pull remote changes from WebDAV server.
 #[tauri::command]
-pub fn sync_pull(db: State<'_, DbConn>) -> Result<SyncStatus, String> {
+pub fn sync_pull(db: State<'_, DbConn>) -> AppResult<SyncStatus> {
     let config = get_webdav_config_inner(&db)?;
     let client = WebDavClient::new(config);
 
     // Download sync file
     let data = client.get("sync_data.json")?;
-    let payload: SyncPayload = serde_json::from_slice(&data).map_err(|e| e.to_string())?;
+    let payload: SyncPayload = serde_json::from_slice(&data)?;
 
     // Apply remote changes
     import_sync_data(&db, &payload)?;
@@ -137,7 +138,7 @@ pub fn sync_pull(db: State<'_, DbConn>) -> Result<SyncStatus, String> {
         "INSERT OR REPLACE INTO settings (key, value) VALUES ('last_sync', ?1)",
         params![now],
     )
-    .map_err(|e| e.to_string())?;
+    ?;
 
     Ok(SyncStatus {
         last_sync: Some(now),
@@ -149,7 +150,7 @@ pub fn sync_pull(db: State<'_, DbConn>) -> Result<SyncStatus, String> {
 
 /// Full sync: push then pull.
 #[tauri::command]
-pub fn sync_full(db: State<'_, DbConn>) -> Result<SyncStatus, String> {
+pub fn sync_full(db: State<'_, DbConn>) -> AppResult<SyncStatus> {
     sync_push_inner(&db)?;
     sync_pull_inner(&db)?;
 
@@ -180,7 +181,7 @@ pub fn sync_full(db: State<'_, DbConn>) -> Result<SyncStatus, String> {
 
 /// Get sync status.
 #[tauri::command]
-pub fn get_sync_status(db: State<'_, DbConn>) -> Result<SyncStatus, String> {
+pub fn get_sync_status(db: State<'_, DbConn>) -> AppResult<SyncStatus> {
     let conn = db.conn.lock();
 
     let last_sync: Option<String> = conn
@@ -209,7 +210,7 @@ pub fn get_sync_status(db: State<'_, DbConn>) -> Result<SyncStatus, String> {
 
 // Helper functions
 
-fn get_webdav_config_inner(db: &State<'_, DbConn>) -> Result<WebDavConfig, String> {
+fn get_webdav_config_inner(db: &State<'_, DbConn>) -> AppResult<WebDavConfig> {
     let conn = db.conn.lock();
 
     let config_json: Option<String> = conn
@@ -222,24 +223,24 @@ fn get_webdav_config_inner(db: &State<'_, DbConn>) -> Result<WebDavConfig, Strin
 
     if let Some(json) = config_json {
         let mut config: WebDavConfig =
-            serde_json::from_str(&json).map_err(|e| e.to_string())?;
+            serde_json::from_str(&json)?;
         if !config.username.is_empty() {
             config.password = crate::sync::retrieve_webdav_password(&config.username)
                 .unwrap_or_default();
         }
         Ok(config)
     } else {
-        Err("WebDAV not configured".to_string())
+        Err(AppError::NotFound("WebDAV not configured".to_string()))
     }
 }
 
-fn export_sync_data(db: &State<'_, DbConn>) -> Result<SyncPayload, String> {
+fn export_sync_data(db: &State<'_, DbConn>) -> AppResult<SyncPayload> {
     let conn = db.conn.lock();
 
     // Export reading progress
     let mut stmt = conn
         .prepare("SELECT * FROM reading_progress")
-        .map_err(|e| e.to_string())?;
+        ?;
     let progress: Vec<serde_json::Value> = stmt
         .query_map([], |row| {
             Ok(serde_json::json!({
@@ -251,14 +252,14 @@ fn export_sync_data(db: &State<'_, DbConn>) -> Result<SyncPayload, String> {
                 "last_read_at": row.get::<_, String>(5)?,
             }))
         })
-        .map_err(|e| e.to_string())?
+        ?
         .filter_map(|r| r.ok())
         .collect();
 
     // Export annotations
     let mut stmt = conn
         .prepare("SELECT * FROM annotations WHERE deleted_at IS NULL")
-        .map_err(|e| e.to_string())?;
+        ?;
     let annotations: Vec<serde_json::Value> = stmt
         .query_map([], |row| {
             Ok(serde_json::json!({
@@ -276,14 +277,14 @@ fn export_sync_data(db: &State<'_, DbConn>) -> Result<SyncPayload, String> {
                 "updated_at": row.get::<_, String>(15)?,
             }))
         })
-        .map_err(|e| e.to_string())?
+        ?
         .filter_map(|r| r.ok())
         .collect();
 
     // Export tags
     let mut stmt = conn
         .prepare("SELECT * FROM tags")
-        .map_err(|e| e.to_string())?;
+        ?;
     let tags: Vec<serde_json::Value> = stmt
         .query_map([], |row| {
             Ok(serde_json::json!({
@@ -294,14 +295,14 @@ fn export_sync_data(db: &State<'_, DbConn>) -> Result<SyncPayload, String> {
                 "sort_order": row.get::<_, i64>(4)?,
             }))
         })
-        .map_err(|e| e.to_string())?
+        ?
         .filter_map(|r| r.ok())
         .collect();
 
     // Export groups
     let mut stmt = conn
         .prepare("SELECT * FROM groups")
-        .map_err(|e| e.to_string())?;
+        ?;
     let groups: Vec<serde_json::Value> = stmt
         .query_map([], |row| {
             Ok(serde_json::json!({
@@ -312,14 +313,14 @@ fn export_sync_data(db: &State<'_, DbConn>) -> Result<SyncPayload, String> {
                 "sort_order": row.get::<_, i64>(4)?,
             }))
         })
-        .map_err(|e| e.to_string())?
+        ?
         .filter_map(|r| r.ok())
         .collect();
 
     // Export rules
     let mut stmt = conn
         .prepare("SELECT * FROM rules")
-        .map_err(|e| e.to_string())?;
+        ?;
     let rules: Vec<serde_json::Value> = stmt
         .query_map([], |row| {
             Ok(serde_json::json!({
@@ -333,7 +334,7 @@ fn export_sync_data(db: &State<'_, DbConn>) -> Result<SyncPayload, String> {
                 "priority": row.get::<_, i64>(7)?,
             }))
         })
-        .map_err(|e| e.to_string())?
+        ?
         .filter_map(|r| r.ok())
         .collect();
 
@@ -347,7 +348,7 @@ fn export_sync_data(db: &State<'_, DbConn>) -> Result<SyncPayload, String> {
     })
 }
 
-fn import_sync_data(db: &State<'_, DbConn>, payload: &SyncPayload) -> Result<(), String> {
+fn import_sync_data(db: &State<'_, DbConn>, payload: &SyncPayload) -> AppResult<()> {
     let conn = db.conn.lock();
 
     // Import reading progress (upsert)
@@ -363,7 +364,7 @@ fn import_sync_data(db: &State<'_, DbConn>, payload: &SyncPayload) -> Result<(),
                  VALUES (?1, ?2, ?3, ?4, COALESCE(?5, datetime('now')))",
                 params![book_id, chapter_id, scroll_offset, percentage, p["last_read_at"].as_str()],
             )
-            .map_err(|e| e.to_string())?;
+            ?;
         }
     }
 
@@ -394,7 +395,7 @@ fn import_sync_data(db: &State<'_, DbConn>, payload: &SyncPayload) -> Result<(),
                     a["updated_at"].as_str(),
                 ],
             )
-            .map_err(|e| e.to_string())?;
+            ?;
         }
     }
 
@@ -412,7 +413,7 @@ fn import_sync_data(db: &State<'_, DbConn>, payload: &SyncPayload) -> Result<(),
                     t["sort_order"].as_i64().unwrap_or(0),
                 ],
             )
-            .map_err(|e| e.to_string())?;
+            ?;
         }
     }
 
@@ -430,35 +431,35 @@ fn import_sync_data(db: &State<'_, DbConn>, payload: &SyncPayload) -> Result<(),
                     g["sort_order"].as_i64().unwrap_or(0),
                 ],
             )
-            .map_err(|e| e.to_string())?;
+            ?;
         }
     }
 
     Ok(())
 }
 
-fn sync_push_inner(db: &State<'_, DbConn>) -> Result<(), String> {
+fn sync_push_inner(db: &State<'_, DbConn>) -> AppResult<()> {
     let config = get_webdav_config_inner(db)?;
     let client = WebDavClient::new(config);
     client.mkdir("")?;
 
     let payload = export_sync_data(db)?;
-    let json = serde_json::to_string_pretty(&payload).map_err(|e| e.to_string())?;
+    let json = serde_json::to_string_pretty(&payload)?;
     client.put("sync_data.json", json.as_bytes())?;
 
     let conn = db.conn.lock();
     conn.execute("UPDATE sync_log SET synced = 1 WHERE synced = 0", [])
-        .map_err(|e| e.to_string())?;
+        ?;
 
     Ok(())
 }
 
-fn sync_pull_inner(db: &State<'_, DbConn>) -> Result<(), String> {
+fn sync_pull_inner(db: &State<'_, DbConn>) -> AppResult<()> {
     let config = get_webdav_config_inner(db)?;
     let client = WebDavClient::new(config);
 
     let data = client.get("sync_data.json")?;
-    let payload: SyncPayload = serde_json::from_slice(&data).map_err(|e| e.to_string())?;
+    let payload: SyncPayload = serde_json::from_slice(&data)?;
     import_sync_data(db, &payload)?;
 
     Ok(())

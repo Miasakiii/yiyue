@@ -1,3 +1,4 @@
+use crate::error::{AppError, AppResult};
 use serde::Serialize;
 
 #[derive(Debug, Serialize)]
@@ -16,10 +17,10 @@ pub struct DictMeaning {
 /// Look up a word using the Free Dictionary API.
 /// Falls back to a simple result for Chinese text.
 #[tauri::command(async)]
-pub async fn lookup_word(word: String) -> Result<DictResult, String> {
+pub async fn lookup_word(word: String) -> AppResult<DictResult> {
     let word = word.trim().to_string();
     if word.is_empty() {
-        return Err("Empty word".to_string());
+        return Err(AppError::InvalidInput("Empty word".to_string()));
     }
 
     // For very long selections, just take the first "word"
@@ -53,13 +54,13 @@ pub async fn lookup_word(word: String) -> Result<DictResult, String> {
     let client = reqwest::Client::builder()
         .timeout(std::time::Duration::from_secs(5))
         .build()
-        .map_err(|e| e.to_string())?;
+        .map_err(|e| AppError::Network(e.to_string()))?;
 
     let response = client
         .get(&url)
         .send()
         .await
-        .map_err(|e| format!("Network error: {}", e))?;
+        .map_err(|e| AppError::Network(format!("Network error: {}", e)))?;
 
     if !response.status().is_success() {
         // Word not found — return a fallback
@@ -76,10 +77,10 @@ pub async fn lookup_word(word: String) -> Result<DictResult, String> {
     let json: serde_json::Value = response
         .json()
         .await
-        .map_err(|e| format!("Failed to parse response: {}", e))?;
+        .map_err(|e| AppError::Parse(format!("Failed to parse response: {}", e)))?;
 
     // Parse the Free Dictionary API response
-    let entries = json.as_array().ok_or("Invalid response format")?;
+    let entries = json.as_array().ok_or(AppError::Parse("Invalid response format".to_string()))?;
     if entries.is_empty() {
         return Ok(DictResult {
             word: lookup,

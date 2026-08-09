@@ -1,3 +1,4 @@
+use crate::error::{AppError, AppResult};
 use crate::commands::search as search_cmd;
 use crate::db::DbConn;
 use crate::rules::{self, Rule, RuleGroup};
@@ -8,11 +9,11 @@ use uuid::Uuid;
 /* ---------- Rule Groups ---------- */
 
 #[tauri::command]
-pub fn get_rule_groups(db: State<'_, DbConn>) -> Result<Vec<RuleGroup>, String> {
+pub fn get_rule_groups(db: State<'_, DbConn>) -> AppResult<Vec<RuleGroup>> {
     let conn = db.conn.lock();
     let mut stmt = conn
         .prepare("SELECT id, name, description, is_preset, enabled FROM rule_groups ORDER BY name")
-        .map_err(|e| e.to_string())?;
+        ?;
 
     let rows = stmt
         .query_map([], |row| {
@@ -24,11 +25,11 @@ pub fn get_rule_groups(db: State<'_, DbConn>) -> Result<Vec<RuleGroup>, String> 
                 enabled: row.get(4)?,
             })
         })
-        .map_err(|e| e.to_string())?;
+        ?;
 
     let mut groups = Vec::new();
     for row in rows {
-        groups.push(row.map_err(|e| e.to_string())?);
+        groups.push(row?);
     }
     Ok(groups)
 }
@@ -39,7 +40,7 @@ pub fn create_rule_group(
     name: String,
     description: Option<String>,
     is_preset: bool,
-) -> Result<RuleGroup, String> {
+) -> AppResult<RuleGroup> {
     let conn = db.conn.lock();
     let id = Uuid::new_v4().to_string();
 
@@ -47,7 +48,7 @@ pub fn create_rule_group(
         "INSERT INTO rule_groups (id, name, description, is_preset, enabled) VALUES (?1, ?2, ?3, ?4, 1)",
         params![id, name, description, if is_preset { 1 } else { 0 }],
     )
-    .map_err(|e| e.to_string())?;
+    ?;
 
     Ok(RuleGroup {
         id,
@@ -59,24 +60,24 @@ pub fn create_rule_group(
 }
 
 #[tauri::command]
-pub fn delete_rule_group(db: State<'_, DbConn>, id: String) -> Result<(), String> {
+pub fn delete_rule_group(db: State<'_, DbConn>, id: String) -> AppResult<()> {
     let conn = db.conn.lock();
     conn.execute(
         "DELETE FROM rule_groups WHERE id = ?1",
         params![id],
     )
-    .map_err(|e| e.to_string())?;
+    ?;
     Ok(())
 }
 
 /* ---------- Rules ---------- */
 
 #[tauri::command]
-pub fn get_rules(db: State<'_, DbConn>) -> Result<Vec<Rule>, String> {
+pub fn get_rules(db: State<'_, DbConn>) -> AppResult<Vec<Rule>> {
     let conn = db.conn.lock();
     let mut stmt = conn
         .prepare("SELECT id, name, pattern, replacement, scope, is_regex, enabled, priority, group_id, description FROM rules ORDER BY priority DESC, name")
-        .map_err(|e| e.to_string())?;
+        ?;
 
     let rows = stmt
         .query_map([], |row| {
@@ -93,11 +94,11 @@ pub fn get_rules(db: State<'_, DbConn>) -> Result<Vec<Rule>, String> {
                 description: row.get(9)?,
             })
         })
-        .map_err(|e| e.to_string())?;
+        ?;
 
     let mut rules = Vec::new();
     for row in rows {
-        rules.push(row.map_err(|e| e.to_string())?);
+        rules.push(row?);
     }
     Ok(rules)
 }
@@ -113,7 +114,7 @@ pub fn create_rule(
     priority: i64,
     group_id: Option<String>,
     description: Option<String>,
-) -> Result<Rule, String> {
+) -> AppResult<Rule> {
     let conn = db.conn.lock();
     let id = Uuid::new_v4().to_string();
 
@@ -132,7 +133,7 @@ pub fn create_rule(
             description,
         ],
     )
-    .map_err(|e| e.to_string())?;
+    ?;
 
     Ok(Rule {
         id,
@@ -162,7 +163,7 @@ pub fn update_rule(
     group_id: Option<String>,
     clear_group: Option<bool>,
     description: Option<String>,
-) -> Result<Rule, String> {
+) -> AppResult<Rule> {
     let conn = db.conn.lock();
 
     // Fetch existing first
@@ -185,7 +186,7 @@ pub fn update_rule(
                 })
             },
         )
-        .map_err(|e| e.to_string())?;
+        ?;
 
     let name = name.unwrap_or(existing.name);
     let pattern = pattern.unwrap_or(existing.pattern);
@@ -219,7 +220,7 @@ pub fn update_rule(
             id,
         ],
     )
-    .map_err(|e| e.to_string())?;
+    ?;
 
     Ok(Rule {
         id,
@@ -236,10 +237,10 @@ pub fn update_rule(
 }
 
 #[tauri::command]
-pub fn delete_rule(db: State<'_, DbConn>, id: String) -> Result<(), String> {
+pub fn delete_rule(db: State<'_, DbConn>, id: String) -> AppResult<()> {
     let conn = db.conn.lock();
     conn.execute("DELETE FROM rules WHERE id = ?1", params![id])
-        .map_err(|e| e.to_string())?;
+        ?;
     Ok(())
 }
 
@@ -250,16 +251,16 @@ pub async fn apply_rules_to_book(
     _app: tauri::AppHandle,
     db: State<'_, DbConn>,
     book_id: String,
-) -> Result<usize, String> {
+) -> AppResult<usize> {
     // Clone the inner Arc so we can move it into spawn_blocking
     let db_arc = db.inner().clone();
-    tokio::task::spawn_blocking(move || -> Result<usize, String> {
+    tokio::task::spawn_blocking(move || -> AppResult<usize> {
         let conn = db_arc.conn.lock();
 
         // Load all enabled rules from DB
         let mut stmt = conn
             .prepare("SELECT id, name, pattern, replacement, scope, is_regex, enabled, priority, group_id, description FROM rules WHERE enabled = 1")
-            .map_err(|e| e.to_string())?;
+            ?;
 
         let db_rules: Vec<Rule> = stmt
             .query_map([], |row| {
@@ -276,7 +277,7 @@ pub async fn apply_rules_to_book(
                     description: row.get(9)?,
                 })
             })
-            .map_err(|e| e.to_string())?
+            ?
             .filter_map(|r| r.ok())
             .collect();
 
@@ -297,13 +298,13 @@ pub async fn apply_rules_to_book(
         // Load chapters
         let mut stmt = conn
             .prepare("SELECT id, content FROM chapters WHERE book_id = ?1 ORDER BY sort_order")
-            .map_err(|e| e.to_string())?;
+            ?;
 
         let chapters: Vec<(String, String)> = stmt
             .query_map(params![book_id], |row| {
                 Ok((row.get(0)?, row.get(1)?))
             })
-            .map_err(|e| e.to_string())?
+            ?
             .filter_map(|r| r.ok())
             .collect();
 
@@ -320,7 +321,7 @@ pub async fn apply_rules_to_book(
                     "UPDATE chapters SET content = ?1 WHERE id = ?2",
                     params![cleaned, chapter_id],
                 )
-                .map_err(|e| e.to_string())?;
+                ?;
 
                 // Re-index in FTS
                 let title_opt: Option<String> = conn
@@ -333,27 +334,27 @@ pub async fn apply_rules_to_book(
                     .flatten();
 
                 search_cmd::index_chapter(&conn, &book_id, &chapter_id, title_opt.as_deref(), &cleaned)
-                    .map_err(|e| e.to_string())?;
+                    ?;
             }
         }
 
         Ok(total_replacements)
     })
     .await
-    .map_err(|e| format!("Apply rules task failed: {}", e))?
+    .map_err(|e| AppError::Internal(format!("Apply rules task failed: {}", e)))?
 }
 
 /* ---------- Preset Seeding ---------- */
 
 #[tauri::command]
-pub fn init_preset_rules(db: State<'_, DbConn>) -> Result<(), String> {
+pub fn init_preset_rules(db: State<'_, DbConn>) -> AppResult<()> {
     let conn = db.conn.lock();
     seed_preset_rules(&conn)
 }
 
 /// Internal helper that seeds preset rules directly from a connection reference.
 /// Used during app setup to ensure presets exist without needing a State guard.
-pub fn seed_preset_rules(conn: &rusqlite::Connection) -> Result<(), String> {
+pub fn seed_preset_rules(conn: &rusqlite::Connection) -> AppResult<()> {
     let group_id = "preset-web-novel";
     conn.execute(
         "INSERT OR IGNORE INTO rule_groups (id, name, description, is_preset, enabled) VALUES (?1, ?2, ?3, 1, 1)",

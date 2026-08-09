@@ -1,4 +1,5 @@
-﻿use crate::db::DbConn;
+use crate::error::{AppResult};
+use crate::db::DbConn;
 use rusqlite::params;
 use serde::Serialize;
 use tauri::State;
@@ -50,7 +51,7 @@ pub fn record_reading_session(
     duration_ms: i64,
     chars_read: Option<i64>,
     chapters_read: Option<i64>,
-) -> Result<(), String> {
+) -> AppResult<()> {
     let conn = db.conn.lock();
     let id = Uuid::new_v4().to_string();
 
@@ -59,27 +60,27 @@ pub fn record_reading_session(
          VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
         params![id, book_id, start_time, end_time, duration_ms, chars_read.unwrap_or(0), chapters_read.unwrap_or(0)],
     )
-    .map_err(|e| e.to_string())?;
+    ?;
 
     Ok(())
 }
 
 /// Get overall reading statistics.
 #[tauri::command]
-pub fn get_reading_stats(db: State<'_, DbConn>) -> Result<ReadingStats, String> {
+pub fn get_reading_stats(db: State<'_, DbConn>) -> AppResult<ReadingStats> {
     let conn = db.conn.lock();
 
     let total_duration_ms: i64 = conn
         .query_row("SELECT COALESCE(SUM(duration_ms), 0) FROM reading_sessions", [], |r| r.get(0))
-        .map_err(|e| e.to_string())?;
+        ?;
 
     let total_chars_read: i64 = conn
         .query_row("SELECT COALESCE(SUM(chars_read), 0) FROM reading_sessions", [], |r| r.get(0))
-        .map_err(|e| e.to_string())?;
+        ?;
 
     let total_sessions: i64 = conn
         .query_row("SELECT COUNT(*) FROM reading_sessions", [], |r| r.get(0))
-        .map_err(|e| e.to_string())?;
+        ?;
 
     let reading_days: i64 = conn
         .query_row(
@@ -87,18 +88,18 @@ pub fn get_reading_stats(db: State<'_, DbConn>) -> Result<ReadingStats, String> 
             [],
             |r| r.get(0),
         )
-        .map_err(|e| e.to_string())?;
+        ?;
 
     // Calculate streaks
     let mut stmt = conn
         .prepare(
             "SELECT DISTINCT date(start_time) as d FROM reading_sessions ORDER BY d DESC",
         )
-        .map_err(|e| e.to_string())?;
+        ?;
 
     let dates: Vec<String> = stmt
         .query_map([], |row| row.get(0))
-        .map_err(|e| e.to_string())?
+        ?
         .filter_map(|r| r.ok())
         .collect();
 
@@ -119,7 +120,7 @@ pub fn get_reading_stats(db: State<'_, DbConn>) -> Result<ReadingStats, String> 
 pub fn get_daily_stats(
     db: State<'_, DbConn>,
     days: Option<i64>,
-) -> Result<Vec<DailyStats>, String> {
+) -> AppResult<Vec<DailyStats>> {
     let conn = db.conn.lock();
     let days = days.unwrap_or(90);
 
@@ -134,7 +135,7 @@ pub fn get_daily_stats(
              GROUP BY d
              ORDER BY d",
         )
-        .map_err(|e| e.to_string())?;
+        ?;
 
     let rows = stmt
         .query_map(params![format!("-{} days", days)], |row| {
@@ -145,11 +146,11 @@ pub fn get_daily_stats(
                 sessions: row.get(3)?,
             })
         })
-        .map_err(|e| e.to_string())?;
+        ?;
 
     let mut result = Vec::new();
     for row in rows {
-        result.push(row.map_err(|e| e.to_string())?);
+        result.push(row?);
     }
     Ok(result)
 }
@@ -159,7 +160,7 @@ pub fn get_daily_stats(
 pub fn get_weekly_stats(
     db: State<'_, DbConn>,
     weeks: Option<i64>,
-) -> Result<Vec<WeeklyStats>, String> {
+) -> AppResult<Vec<WeeklyStats>> {
     let conn = db.conn.lock();
     let weeks = weeks.unwrap_or(12);
 
@@ -174,7 +175,7 @@ pub fn get_weekly_stats(
              GROUP BY week_start
              ORDER BY week_start",
         )
-        .map_err(|e| e.to_string())?;
+        ?;
 
     let rows = stmt
         .query_map(params![format!("-{} weeks", weeks)], |row| {
@@ -185,18 +186,18 @@ pub fn get_weekly_stats(
                 days_read: row.get(3)?,
             })
         })
-        .map_err(|e| e.to_string())?;
+        ?;
 
     let mut result = Vec::new();
     for row in rows {
-        result.push(row.map_err(|e| e.to_string())?);
+        result.push(row?);
     }
     Ok(result)
 }
 
 /// Get per-book reading stats.
 #[tauri::command]
-pub fn get_book_stats(db: State<'_, DbConn>) -> Result<Vec<BookStats>, String> {
+pub fn get_book_stats(db: State<'_, DbConn>) -> AppResult<Vec<BookStats>> {
     let conn = db.conn.lock();
 
     let mut stmt = conn
@@ -212,7 +213,7 @@ pub fn get_book_stats(db: State<'_, DbConn>) -> Result<Vec<BookStats>, String> {
              GROUP BY s.book_id
              ORDER BY total_dur DESC",
         )
-        .map_err(|e| e.to_string())?;
+        ?;
 
     let rows = stmt
         .query_map([], |row| {
@@ -225,11 +226,11 @@ pub fn get_book_stats(db: State<'_, DbConn>) -> Result<Vec<BookStats>, String> {
                 last_read: row.get(5)?,
             })
         })
-        .map_err(|e| e.to_string())?;
+        ?;
 
     let mut result = Vec::new();
     for row in rows {
-        result.push(row.map_err(|e| e.to_string())?);
+        result.push(row?);
     }
     Ok(result)
 }
@@ -244,7 +245,7 @@ pub struct ReadingSpeed {
 pub fn get_reading_speed(
     db: State<'_, DbConn>,
     book_id: String,
-) -> Result<ReadingSpeed, String> {
+) -> AppResult<ReadingSpeed> {
     let conn = db.conn.lock();
 
     // Take the most recent 5 sessions for this book

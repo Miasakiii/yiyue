@@ -44,6 +44,7 @@ CI 门禁：`.github/workflows/ci.yml` 在 push/PR 时按变更区域运行前�
 
 ## 关键约束
 
+- **规模化约束**：书库设计目标为数千本规模。查询必须：按书/用户维度过滤、分页或限定行数、只 select 所需列；禁止无界全表扫描（如不带 LIMIT 的整表遍历）、N+1 查询模式、把整个表载入内存。批量操作（导入/应用规则/重建索引）须有进度反馈、幂等、可中断恢复。
 - **IPC 命令必须成对注册**：新增 Rust 命令后，需同时在 `src-tauri/src/lib.rs` 的 `generate_handler![...]` 中注册，并在 `src-tauri/src/commands/mod.rs` 声明 `pub mod`。漏注册会导致前端 `invoke` 静默失败。
 - **CSP 已收紧**：`tauri.conf.json` 中 `style-src` 仅允许 `'self' 'unsafe-inline'`，新增外部 CSS 资源会破坏 CSP。
 - **安全基线守护**：`security-baseline.json` 固化了权限清单（`capabilities/default.json`）与 CSP/asset 协议快照，`src/__tests__/security-baseline.test.ts` 在 `pnpm test` 中比对。任何扩权需显式更新基线并在提交说明中记录理由。

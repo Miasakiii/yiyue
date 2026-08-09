@@ -1,4 +1,5 @@
-﻿use crate::db::DbConn;
+use crate::error::{AppResult};
+use crate::db::DbConn;
 use rusqlite::params;
 use serde::{Deserialize, Serialize};
 use tauri::State;
@@ -49,7 +50,7 @@ pub fn get_annotations(
     db: State<'_, DbConn>,
     book_id: String,
     chapter_id: Option<String>,
-) -> Result<Vec<Annotation>, String> {
+) -> AppResult<Vec<Annotation>> {
     let conn = db.conn.lock();
 
     let (sql, param_values): (String, Vec<Box<dyn rusqlite::types::ToSql>>) = if let Some(ch_id) = chapter_id {
@@ -74,7 +75,7 @@ pub fn get_annotations(
         )
     };
 
-    let mut stmt = conn.prepare(&sql).map_err(|e| e.to_string())?;
+    let mut stmt = conn.prepare(&sql)?;
     let params_refs: Vec<&dyn rusqlite::types::ToSql> = param_values.iter().map(|p| p.as_ref()).collect();
 
     let rows = stmt
@@ -98,11 +99,11 @@ pub fn get_annotations(
                 updated_at: row.get(15)?,
             })
         })
-        .map_err(|e| e.to_string())?;
+        ?;
 
     let mut annotations = Vec::new();
     for row in rows {
-        annotations.push(row.map_err(|e| e.to_string())?);
+        annotations.push(row?);
     }
     Ok(annotations)
 }
@@ -111,7 +112,7 @@ pub fn get_annotations(
 pub fn create_annotation(
     db: State<'_, DbConn>,
     annotation: CreateAnnotation,
-) -> Result<Annotation, String> {
+) -> AppResult<Annotation> {
     let conn = db.conn.lock();
     let id = Uuid::new_v4().to_string();
     let color = annotation.color.unwrap_or_else(|| "#FFEB3B".to_string());
@@ -140,7 +141,7 @@ pub fn create_annotation(
             tags_json,
         ],
     )
-    .map_err(|e| e.to_string())?;
+    ?;
 
     // Update FTS
     if annotation.selected_text.is_some() || annotation.content.is_some() {
@@ -176,7 +177,7 @@ pub fn update_annotation(
     db: State<'_, DbConn>,
     id: String,
     update: UpdateAnnotation,
-) -> Result<(), String> {
+) -> AppResult<()> {
     let conn = db.conn.lock();
 
     let mut sets = Vec::new();
@@ -207,7 +208,7 @@ pub fn update_annotation(
     let params_refs: Vec<&dyn rusqlite::types::ToSql> = param_values.iter().map(|p| p.as_ref()).collect();
 
     conn.execute(&sql, params_refs.as_slice())
-        .map_err(|e| e.to_string())?;
+        ?;
 
     // Update FTS index with new content
     let _ = conn.execute(
@@ -219,7 +220,7 @@ pub fn update_annotation(
 }
 
 #[tauri::command]
-pub fn delete_annotation(db: State<'_, DbConn>, id: String) -> Result<(), String> {
+pub fn delete_annotation(db: State<'_, DbConn>, id: String) -> AppResult<()> {
     let conn = db.conn.lock();
     // Remove from FTS before soft-delete
     let _ = conn.execute(
@@ -230,6 +231,6 @@ pub fn delete_annotation(db: State<'_, DbConn>, id: String) -> Result<(), String
         "UPDATE annotations SET deleted_at = datetime('now') WHERE id = ?1",
         params![id],
     )
-    .map_err(|e| e.to_string())?;
+    ?;
     Ok(())
 }

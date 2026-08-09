@@ -1,15 +1,16 @@
 ﻿use crate::db::DbConn;
+use crate::error::AppResult;
 use crate::models::*;
 use rusqlite::params;
 use tauri::State;
 use uuid::Uuid;
 
 #[tauri::command]
-pub fn get_tags(db: State<'_, DbConn>) -> Result<Vec<Tag>, String> {
+pub fn get_tags(db: State<'_, DbConn>) -> AppResult<Vec<Tag>> {
     let conn = db.conn.lock();
     let mut stmt = conn
         .prepare("SELECT id, name, color, parent_id, sort_order FROM tags ORDER BY sort_order, name")
-        .map_err(|e| e.to_string())?;
+        ?;
 
     let rows = stmt
         .query_map([], |row| {
@@ -21,11 +22,11 @@ pub fn get_tags(db: State<'_, DbConn>) -> Result<Vec<Tag>, String> {
                 sort_order: row.get(4)?,
             })
         })
-        .map_err(|e| e.to_string())?;
+        ?;
 
     let mut tags = Vec::new();
     for row in rows {
-        tags.push(row.map_err(|e| e.to_string())?);
+        tags.push(row?);
     }
     Ok(tags)
 }
@@ -36,7 +37,7 @@ pub fn create_tag(
     name: String,
     color: Option<String>,
     parent_id: Option<String>,
-) -> Result<Tag, String> {
+) -> AppResult<Tag> {
     let conn = db.conn.lock();
     let id = Uuid::new_v4().to_string();
     let color = color.unwrap_or_else(|| "#6B7280".to_string());
@@ -45,7 +46,7 @@ pub fn create_tag(
         "INSERT INTO tags (id, name, color, parent_id) VALUES (?1, ?2, ?3, ?4)",
         params![id, name, color, parent_id],
     )
-    .map_err(|e| e.to_string())?;
+    ?;
 
     Ok(Tag {
         id,
@@ -57,21 +58,21 @@ pub fn create_tag(
 }
 
 #[tauri::command]
-pub fn delete_tag(db: State<'_, DbConn>, id: String) -> Result<(), String> {
+pub fn delete_tag(db: State<'_, DbConn>, id: String) -> AppResult<()> {
     let conn = db.conn.lock();
     conn.execute("DELETE FROM tags WHERE id = ?1", params![id])
-        .map_err(|e| e.to_string())?;
+        ?;
     Ok(())
 }
 
 #[tauri::command]
-pub fn add_book_tag(db: State<'_, DbConn>, book_id: String, tag_id: String) -> Result<(), String> {
+pub fn add_book_tag(db: State<'_, DbConn>, book_id: String, tag_id: String) -> AppResult<()> {
     let conn = db.conn.lock();
     conn.execute(
         "INSERT OR IGNORE INTO book_tags (book_id, tag_id) VALUES (?1, ?2)",
         params![book_id, tag_id],
     )
-    .map_err(|e| e.to_string())?;
+    ?;
     Ok(())
 }
 
@@ -80,18 +81,18 @@ pub fn remove_book_tag(
     db: State<'_, DbConn>,
     book_id: String,
     tag_id: String,
-) -> Result<(), String> {
+) -> AppResult<()> {
     let conn = db.conn.lock();
     conn.execute(
         "DELETE FROM book_tags WHERE book_id = ?1 AND tag_id = ?2",
         params![book_id, tag_id],
     )
-    .map_err(|e| e.to_string())?;
+    ?;
     Ok(())
 }
 
 #[tauri::command]
-pub fn get_book_tags(db: State<'_, DbConn>, book_id: String) -> Result<Vec<Tag>, String> {
+pub fn get_book_tags(db: State<'_, DbConn>, book_id: String) -> AppResult<Vec<Tag>> {
     let conn = db.conn.lock();
     let mut stmt = conn
         .prepare(
@@ -101,7 +102,7 @@ pub fn get_book_tags(db: State<'_, DbConn>, book_id: String) -> Result<Vec<Tag>,
              WHERE bt.book_id = ?1
              ORDER BY t.sort_order, t.name",
         )
-        .map_err(|e| e.to_string())?;
+        ?;
 
     let rows = stmt
         .query_map(params![book_id], |row| {
@@ -113,21 +114,21 @@ pub fn get_book_tags(db: State<'_, DbConn>, book_id: String) -> Result<Vec<Tag>,
                 sort_order: row.get(4)?,
             })
         })
-        .map_err(|e| e.to_string())?;
+        ?;
 
     let mut tags = Vec::new();
     for row in rows {
-        tags.push(row.map_err(|e| e.to_string())?);
+        tags.push(row?);
     }
     Ok(tags)
 }
 
 #[tauri::command]
-pub fn get_groups(db: State<'_, DbConn>) -> Result<Vec<Group>, String> {
+pub fn get_groups(db: State<'_, DbConn>) -> AppResult<Vec<Group>> {
     let conn = db.conn.lock();
     let mut stmt = conn
         .prepare("SELECT id, name, parent_id, icon, sort_order FROM groups ORDER BY sort_order, name")
-        .map_err(|e| e.to_string())?;
+        ?;
 
     let rows = stmt
         .query_map([], |row| {
@@ -139,11 +140,11 @@ pub fn get_groups(db: State<'_, DbConn>) -> Result<Vec<Group>, String> {
                 sort_order: row.get(4)?,
             })
         })
-        .map_err(|e| e.to_string())?;
+        ?;
 
     let mut groups = Vec::new();
     for row in rows {
-        groups.push(row.map_err(|e| e.to_string())?);
+        groups.push(row?);
     }
     Ok(groups)
 }
@@ -154,7 +155,7 @@ pub fn create_group(
     name: String,
     icon: Option<String>,
     parent_id: Option<String>,
-) -> Result<Group, String> {
+) -> AppResult<Group> {
     let conn = db.conn.lock();
     let id = Uuid::new_v4().to_string();
 
@@ -162,7 +163,7 @@ pub fn create_group(
         "INSERT INTO groups (id, name, icon, parent_id) VALUES (?1, ?2, ?3, ?4)",
         params![id, name, icon, parent_id],
     )
-    .map_err(|e| e.to_string())?;
+    ?;
 
     Ok(Group {
         id,
@@ -174,10 +175,10 @@ pub fn create_group(
 }
 
 #[tauri::command]
-pub fn delete_group(db: State<'_, DbConn>, id: String) -> Result<(), String> {
+pub fn delete_group(db: State<'_, DbConn>, id: String) -> AppResult<()> {
     let conn = db.conn.lock();
     conn.execute("DELETE FROM groups WHERE id = ?1", params![id])
-        .map_err(|e| e.to_string())?;
+        ?;
     Ok(())
 }
 
@@ -186,13 +187,13 @@ pub fn add_book_group(
     db: State<'_, DbConn>,
     book_id: String,
     group_id: String,
-) -> Result<(), String> {
+) -> AppResult<()> {
     let conn = db.conn.lock();
     conn.execute(
         "INSERT OR IGNORE INTO book_groups (book_id, group_id) VALUES (?1, ?2)",
         params![book_id, group_id],
     )
-    .map_err(|e| e.to_string())?;
+    ?;
     Ok(())
 }
 
@@ -201,18 +202,18 @@ pub fn remove_book_group(
     db: State<'_, DbConn>,
     book_id: String,
     group_id: String,
-) -> Result<(), String> {
+) -> AppResult<()> {
     let conn = db.conn.lock();
     conn.execute(
         "DELETE FROM book_groups WHERE book_id = ?1 AND group_id = ?2",
         params![book_id, group_id],
     )
-    .map_err(|e| e.to_string())?;
+    ?;
     Ok(())
 }
 
 #[tauri::command]
-pub fn get_book_groups(db: State<'_, DbConn>, book_id: String) -> Result<Vec<Group>, String> {
+pub fn get_book_groups(db: State<'_, DbConn>, book_id: String) -> AppResult<Vec<Group>> {
     let conn = db.conn.lock();
     let mut stmt = conn
         .prepare(
@@ -222,7 +223,7 @@ pub fn get_book_groups(db: State<'_, DbConn>, book_id: String) -> Result<Vec<Gro
              WHERE bg.book_id = ?1
              ORDER BY g.sort_order, g.name",
         )
-        .map_err(|e| e.to_string())?;
+        ?;
 
     let rows = stmt
         .query_map(params![book_id], |row| {
@@ -234,11 +235,11 @@ pub fn get_book_groups(db: State<'_, DbConn>, book_id: String) -> Result<Vec<Gro
                 sort_order: row.get(4)?,
             })
         })
-        .map_err(|e| e.to_string())?;
+        ?;
 
     let mut groups = Vec::new();
     for row in rows {
-        groups.push(row.map_err(|e| e.to_string())?);
+        groups.push(row?);
     }
     Ok(groups)
 }

@@ -1,3 +1,4 @@
+use crate::error::{AppError, AppResult};
 use serde::{Deserialize, Serialize};
 
 /// Application-level error for keyring operations.
@@ -34,30 +35,30 @@ impl Default for WebDavConfig {
 /// Persist the password in the OS-level credential store.
 /// Returns an empty result on success; the caller can surface a user-friendly
 /// message on failure.
-pub fn store_webdav_password(username: &str, password: &str) -> Result<(), String> {
+pub fn store_webdav_password(username: &str, password: &str) -> AppResult<()> {
     let entry = keyring::Entry::new(KEYRING_SERVICE, username)
-        .map_err(|e| format!("Failed to access keyring: {}", e))?;
+        .map_err(|e| AppError::Internal(format!("Failed to access keyring: {}", e)))?;
     entry
         .set_password(password)
-        .map_err(|e| format!("Failed to store password: {}", e))
+        .map_err(|e| AppError::Internal(format!("Failed to store password: {}", e)))
 }
 
 /// Retrieve the WebDAV password from the OS-level credential store.
-pub fn retrieve_webdav_password(username: &str) -> Result<String, String> {
+pub fn retrieve_webdav_password(username: &str) -> AppResult<String> {
     let entry = keyring::Entry::new(KEYRING_SERVICE, username)
-        .map_err(|e| format!("Failed to access keyring: {}", e))?;
+        .map_err(|e| AppError::Internal(format!("Failed to access keyring: {}", e)))?;
     entry
         .get_password()
-        .map_err(|e| format!("Failed to retrieve password: {}", e))
+        .map_err(|e| AppError::Internal(format!("Failed to retrieve password: {}", e)))
 }
 
 /// Delete the WebDAV password from the OS-level credential store.
-pub fn delete_webdav_password(username: &str) -> Result<(), String> {
+pub fn delete_webdav_password(username: &str) -> AppResult<()> {
     let entry = keyring::Entry::new(KEYRING_SERVICE, username)
-        .map_err(|e| format!("Failed to access keyring: {}", e))?;
+        .map_err(|e| AppError::Internal(format!("Failed to access keyring: {}", e)))?;
     entry
         .delete_credential()
-        .map_err(|e| format!("Failed to delete password: {}", e))
+        .map_err(|e| AppError::Internal(format!("Failed to delete password: {}", e)))
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -104,7 +105,7 @@ impl WebDavClient {
     }
 
     /// Create directory on WebDAV server
-    pub fn mkdir(&self, path: &str) -> Result<(), String> {
+    pub fn mkdir(&self, path: &str) -> AppResult<()> {
         let url = format!("{}/{}", self.base_url().trim_end_matches('/'), path.trim_start_matches('/'));
 
         let resp = self
@@ -112,18 +113,18 @@ impl WebDavClient {
             .request(reqwest::Method::from_bytes(b"MKCOL").unwrap(), &url)
             .basic_auth(&self.config.username, Some(&self.config.password))
             .send()
-            .map_err(|e| format!("WebDAV request failed: {}", e))?;
+            .map_err(|e| AppError::Network(format!("WebDAV request failed: {}", e)))?;
 
         if resp.status().is_success() || resp.status() == 405 {
             // 405 means directory already exists
             Ok(())
         } else {
-            Err(format!("WebDAV MKCOL failed: {}", resp.status()))
+            Err(AppError::Network(format!("WebDAV MKCOL failed: {}", resp.status())))
         }
     }
 
     /// Upload file to WebDAV server
-    pub fn put(&self, path: &str, content: &[u8]) -> Result<(), String> {
+    pub fn put(&self, path: &str, content: &[u8]) -> AppResult<()> {
         let url = format!("{}/{}", self.base_url().trim_end_matches('/'), path.trim_start_matches('/'));
 
         let resp = self
@@ -133,17 +134,17 @@ impl WebDavClient {
             .header("Content-Type", "application/octet-stream")
             .body(content.to_vec())
             .send()
-            .map_err(|e| format!("WebDAV PUT failed: {}", e))?;
+            .map_err(|e| AppError::Network(format!("WebDAV PUT failed: {}", e)))?;
 
         if resp.status().is_success() {
             Ok(())
         } else {
-            Err(format!("WebDAV PUT failed: {}", resp.status()))
+            Err(AppError::Network(format!("WebDAV PUT failed: {}", resp.status())))
         }
     }
 
     /// Download file from WebDAV server
-    pub fn get(&self, path: &str) -> Result<Vec<u8>, String> {
+    pub fn get(&self, path: &str) -> AppResult<Vec<u8>> {
         let url = format!("{}/{}", self.base_url().trim_end_matches('/'), path.trim_start_matches('/'));
 
         let resp = self
@@ -151,24 +152,22 @@ impl WebDavClient {
             .get(&url)
             .basic_auth(&self.config.username, Some(&self.config.password))
             .send()
-            .map_err(|e| format!("WebDAV GET failed: {}", e))?;
+            .map_err(|e| AppError::Network(format!("WebDAV GET failed: {}", e)))?;
 
         if resp.status().is_success() {
             resp.bytes()
                 .map(|b| b.to_vec())
-                .map_err(|e| format!("Failed to read response: {}", e))
+                .map_err(|e| AppError::Network(format!("Failed to read response: {}", e)))
         } else {
-            Err(format!("WebDAV GET failed: {}", resp.status()))
+            Err(AppError::Network(format!("WebDAV GET failed: {}", resp.status())))
         }
     }
 
     /// Test connection to WebDAV server
-    pub fn test_connection(&self) -> Result<(), String> {
+    pub fn test_connection(&self) -> AppResult<()> {
         // Reject non-HTTPS connections with a clear error message
         if !self.config.server_url.starts_with("https://") && !self.config.server_url.is_empty() {
-            return Err(
-                "安全警告：WebDAV 连接未使用 HTTPS，凭据将以明文传输。请使用 HTTPS 地址。".to_string(),
-            );
+            return Err(AppError::Network("安全警告：WebDAV 连接未使用 HTTPS，凭据将以明文传输。请使用 HTTPS 地址。".to_string()));
         }
 
         let url = self.base_url();
@@ -181,12 +180,12 @@ impl WebDavClient {
             .header("Content-Type", "application/xml")
             .body(r#"<?xml version="1.0"?><D:propfind xmlns:D="DAV:"><D:prop><D:resourcetype/></D:prop></D:propfind>"#)
             .send()
-            .map_err(|e| format!("Connection failed: {}", e))?;
+            .map_err(|e| AppError::Network(format!("Connection failed: {}", e)))?;
 
         if resp.status().is_success() || resp.status() == 207 {
             Ok(())
         } else {
-            Err(format!("Connection test failed: {}", resp.status()))
+            Err(AppError::Network(format!("Connection test failed: {}", resp.status())))
         }
     }
 }

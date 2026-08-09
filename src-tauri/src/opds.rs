@@ -517,7 +517,7 @@ fn handle_upload(request: &mut Request) -> AppResult<Option<String>> {
     request
         .as_reader()
         .read_to_end(&mut body)
-        .map_err(|e| AppError::Io(e.to_string()))?;
+        ?;
 
     // Split the multipart body at the byte level: ebook files are binary, so a
     // lossy UTF-8 conversion of the whole body would corrupt the upload.
@@ -564,10 +564,10 @@ fn handle_upload(request: &mut Request) -> AppResult<Option<String>> {
 
         let temp_name = format!("{}.{}", Uuid::new_v4(), ext);
         let temp_dir = std::env::temp_dir().join("yiyue-uploads");
-        std::fs::create_dir_all(&temp_dir).map_err(|e| AppError::Io(e.to_string()))?;
+        std::fs::create_dir_all(&temp_dir)?;
 
         let temp_path = temp_dir.join(&temp_name);
-        std::fs::write(&temp_path, content).map_err(|e| AppError::Io(e.to_string()))?;
+        std::fs::write(&temp_path, content)?;
 
         return Ok(Some(temp_path.to_string_lossy().to_string()));
     }

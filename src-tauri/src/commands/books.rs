@@ -1,4 +1,5 @@
-﻿use crate::commands::search as search_cmd;
+use crate::commands::search as search_cmd;
+use crate::error::{AppError, AppResult};
 use crate::db::DbConn;
 use crate::models::*;
 use rusqlite::params;
@@ -8,7 +9,7 @@ use tauri::State;
 pub fn get_books(
     db: State<'_, DbConn>,
     filter: Option<BookFilter>,
-) -> Result<Vec<BookListItem>, String> {
+) -> AppResult<Vec<BookListItem>> {
     let conn = db.conn.lock();
     let filter = filter.unwrap_or(BookFilter {
         kind: None,
@@ -67,7 +68,7 @@ pub fn get_books(
         _ => sql.push_str(" ORDER BY b.updated_at DESC"),
     }
 
-    let mut stmt = conn.prepare(&sql).map_err(|e| e.to_string())?;
+    let mut stmt = conn.prepare(&sql)?;
     let params_refs: Vec<&dyn rusqlite::types::ToSql> = param_values.iter().map(|p| p.as_ref()).collect();
 
     let rows = stmt
@@ -87,17 +88,17 @@ pub fn get_books(
                 starred: row.get::<_, i64>(11)? != 0,
             })
         })
-        .map_err(|e| e.to_string())?;
+        ?;
 
     let mut books = Vec::new();
     for row in rows {
-        books.push(row.map_err(|e| e.to_string())?);
+        books.push(row?);
     }
     Ok(books)
 }
 
 #[tauri::command]
-pub fn get_book(db: State<'_, DbConn>, id: String) -> Result<Book, String> {
+pub fn get_book(db: State<'_, DbConn>, id: String) -> AppResult<Book> {
     let conn = db.conn.lock();
     conn.query_row(
         "SELECT id, kind, title, author, file_hash, file_path, file_size, format,
@@ -127,7 +128,7 @@ pub fn get_book(db: State<'_, DbConn>, id: String) -> Result<Book, String> {
             })
         },
     )
-    .map_err(|e| e.to_string())
+    .map_err(AppError::Sqlite)
 }
 
 #[tauri::command]
@@ -135,7 +136,7 @@ pub fn update_book(
     db: State<'_, DbConn>,
     id: String,
     update: UpdateBook,
-) -> Result<(), String> {
+) -> AppResult<()> {
     let conn = db.conn.lock();
 
     let mut sets = Vec::new();
@@ -169,13 +170,13 @@ pub fn update_book(
     let params_refs: Vec<&dyn rusqlite::types::ToSql> = param_values.iter().map(|p| p.as_ref()).collect();
 
     conn.execute(&sql, params_refs.as_slice())
-        .map_err(|e| e.to_string())?;
+        ?;
 
     Ok(())
 }
 
 #[tauri::command]
-pub fn delete_book(db: State<'_, DbConn>, id: String) -> Result<(), String> {
+pub fn delete_book(db: State<'_, DbConn>, id: String) -> AppResult<()> {
     let conn = db.conn.lock();
 
     // Remove from FTS indexes
@@ -186,19 +187,19 @@ pub fn delete_book(db: State<'_, DbConn>, id: String) -> Result<(), String> {
         "UPDATE books SET deleted_at = datetime('now') WHERE id = ?1",
         params![id],
     )
-    .map_err(|e| e.to_string())?;
+    ?;
     Ok(())
 }
 
 #[tauri::command]
-pub fn get_chapters(db: State<'_, DbConn>, book_id: String) -> Result<Vec<Chapter>, String> {
+pub fn get_chapters(db: State<'_, DbConn>, book_id: String) -> AppResult<Vec<Chapter>> {
     let conn = db.conn.lock();
     let mut stmt = conn
         .prepare(
             "SELECT id, book_id, title, level, sort_order, start_offset, end_offset, char_count
              FROM chapters WHERE book_id = ?1 ORDER BY sort_order",
         )
-        .map_err(|e| e.to_string())?;
+        ?;
 
     let rows = stmt
         .query_map(params![book_id], |row| {
@@ -213,11 +214,11 @@ pub fn get_chapters(db: State<'_, DbConn>, book_id: String) -> Result<Vec<Chapte
                 char_count: row.get(7)?,
             })
         })
-        .map_err(|e| e.to_string())?;
+        ?;
 
     let mut chapters = Vec::new();
     for row in rows {
-        chapters.push(row.map_err(|e| e.to_string())?);
+        chapters.push(row?);
     }
     Ok(chapters)
 }
@@ -226,7 +227,7 @@ pub fn get_chapters(db: State<'_, DbConn>, book_id: String) -> Result<Vec<Chapte
 pub fn get_progress(
     db: State<'_, DbConn>,
     book_id: String,
-) -> Result<Option<ReadingProgress>, String> {
+) -> AppResult<Option<ReadingProgress>> {
     let conn = db.conn.lock();
     let result = conn.query_row(
         "SELECT book_id, chapter_id, scroll_offset, page_index, percentage, last_read_at
@@ -247,7 +248,7 @@ pub fn get_progress(
     match result {
         Ok(p) => Ok(Some(p)),
         Err(rusqlite::Error::QueryReturnedNoRows) => Ok(None),
-        Err(e) => Err(e.to_string()),
+        Err(e) => Err(AppError::Sqlite(e)),
     }
 }
 
@@ -256,7 +257,7 @@ pub fn update_progress(
     db: State<'_, DbConn>,
     book_id: String,
     progress: UpdateProgress,
-) -> Result<(), String> {
+) -> AppResult<()> {
     let conn = db.conn.lock();
 
     conn.execute(
@@ -276,20 +277,20 @@ pub fn update_progress(
             progress.percentage,
         ],
     )
-    .map_err(|e| e.to_string())?;
+    ?;
 
     // Also update the book's updated_at
     conn.execute(
         "UPDATE books SET updated_at = datetime('now') WHERE id = ?1",
         params![book_id],
     )
-    .map_err(|e| e.to_string())?;
+    ?;
 
     Ok(())
 }
 
 #[tauri::command]
-pub fn toggle_favorite(db: State<'_, DbConn>, book_id: String) -> Result<bool, String> {
+pub fn toggle_favorite(db: State<'_, DbConn>, book_id: String) -> AppResult<bool> {
     let conn = db.conn.lock();
 
     let exists: bool = conn
@@ -298,19 +299,19 @@ pub fn toggle_favorite(db: State<'_, DbConn>, book_id: String) -> Result<bool, S
             params![book_id],
             |row| row.get::<_, i64>(0),
         )
-        .map_err(|e| e.to_string())?
+        ?
         > 0;
 
     if exists {
         conn.execute("DELETE FROM favorites WHERE book_id = ?1", params![book_id])
-            .map_err(|e| e.to_string())?;
+            ?;
         Ok(false)
     } else {
         conn.execute(
             "INSERT INTO favorites (book_id) VALUES (?1)",
             params![book_id],
         )
-        .map_err(|e| e.to_string())?;
+        ?;
         Ok(true)
     }
 }
@@ -319,21 +320,21 @@ pub fn toggle_favorite(db: State<'_, DbConn>, book_id: String) -> Result<bool, S
 pub fn get_chapter_content(
     db: State<'_, DbConn>,
     chapter_id: String,
-) -> Result<String, String> {
+) -> AppResult<String> {
     let conn = db.conn.lock();
     conn.query_row(
         "SELECT content FROM chapters WHERE id = ?1",
         params![chapter_id],
         |row| row.get(0),
     )
-    .map_err(|e| e.to_string())
+    .map_err(AppError::Sqlite)
 }
 
 #[tauri::command]
 pub fn get_reading_profile(
     db: State<'_, DbConn>,
     book_id: String,
-) -> Result<Option<ReadingProfile>, String> {
+) -> AppResult<Option<ReadingProfile>> {
     let conn = db.conn.lock();
     let result = conn.query_row(
         "SELECT book_id, font_size, line_height, font_family, content_width, paragraph_spacing, text_align, page_animation
@@ -356,7 +357,7 @@ pub fn get_reading_profile(
     match result {
         Ok(p) => Ok(Some(p)),
         Err(rusqlite::Error::QueryReturnedNoRows) => Ok(None),
-        Err(e) => Err(e.to_string()),
+        Err(e) => Err(AppError::Sqlite(e)),
     }
 }
 
@@ -365,7 +366,7 @@ pub fn save_reading_profile(
     db: State<'_, DbConn>,
     book_id: String,
     profile: SaveReadingProfile,
-) -> Result<(), String> {
+) -> AppResult<()> {
     let conn = db.conn.lock();
 
     conn.execute(
@@ -398,7 +399,7 @@ pub fn save_reading_profile(
             profile.page_animation,
         ],
     )
-    .map_err(|e| e.to_string())?;
+    ?;
 
     Ok(())
 }

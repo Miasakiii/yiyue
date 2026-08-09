@@ -1,3 +1,4 @@
+use crate::error::AppResult;
 use crate::db::DbConn;
 use rusqlite::params;
 use serde::{Deserialize, Serialize};
@@ -26,14 +27,14 @@ pub struct CreateBookmark {
 pub fn get_bookmarks(
     db: State<'_, DbConn>,
     book_id: String,
-) -> Result<Vec<Bookmark>, String> {
+) -> AppResult<Vec<Bookmark>> {
     let conn = db.conn.lock();
     let mut stmt = conn
         .prepare(
             "SELECT id, book_id, chapter_id, scroll_offset, title, created_at
              FROM bookmarks WHERE book_id = ?1 ORDER BY created_at DESC",
         )
-        .map_err(|e| e.to_string())?;
+        ?;
     let rows = stmt
         .query_map(params![book_id], |row| {
             Ok(Bookmark {
@@ -45,10 +46,10 @@ pub fn get_bookmarks(
                 created_at: row.get(5)?,
             })
         })
-        .map_err(|e| e.to_string())?;
+        ?;
     let mut result = Vec::new();
     for row in rows {
-        result.push(row.map_err(|e| e.to_string())?);
+        result.push(row?);
     }
     Ok(result)
 }
@@ -57,7 +58,7 @@ pub fn get_bookmarks(
 pub fn create_bookmark(
     db: State<'_, DbConn>,
     bookmark: CreateBookmark,
-) -> Result<Bookmark, String> {
+) -> AppResult<Bookmark> {
     let conn = db.conn.lock();
     let id = Uuid::new_v4().to_string();
     let now = chrono::Utc::now().to_rfc3339();
@@ -75,7 +76,7 @@ pub fn create_bookmark(
             now,
         ],
     )
-    .map_err(|e| e.to_string())?;
+    ?;
 
     Ok(Bookmark {
         id,
@@ -88,10 +89,10 @@ pub fn create_bookmark(
 }
 
 #[tauri::command]
-pub fn delete_bookmark(db: State<'_, DbConn>, id: String) -> Result<(), String> {
+pub fn delete_bookmark(db: State<'_, DbConn>, id: String) -> AppResult<()> {
     let conn = db.conn.lock();
     conn.execute("DELETE FROM bookmarks WHERE id = ?1", params![id])
-        .map_err(|e| e.to_string())?;
+        ?;
     Ok(())
 }
 
@@ -100,12 +101,12 @@ pub fn update_bookmark(
     db: State<'_, DbConn>,
     id: String,
     title: String,
-) -> Result<(), String> {
+) -> AppResult<()> {
     let conn = db.conn.lock();
     conn.execute(
         "UPDATE bookmarks SET title = ?1 WHERE id = ?2",
         params![title, id],
     )
-    .map_err(|e| e.to_string())?;
+    ?;
     Ok(())
 }

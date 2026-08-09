@@ -1,3 +1,4 @@
+use crate::error::AppResult;
 use crate::db::DbConn;
 use crate::search;
 use serde::Serialize;
@@ -25,7 +26,7 @@ pub fn search_all(
     db: State<'_, DbConn>,
     query: String,
     scope: Option<String>, // "all", "books", "content", "annotations"
-) -> Result<Vec<SearchResult>, String> {
+) -> AppResult<Vec<SearchResult>> {
     let conn = db.conn.lock();
     let scope = scope.as_deref().unwrap_or("all");
     let mut results = Vec::new();
@@ -62,7 +63,7 @@ fn search_fts_books(
     tokenized: &str,
     scope: &str,
     results: &mut Vec<SearchResult>,
-) -> Result<(), String> {
+) -> AppResult<()> {
     if scope != "all" && scope != "books" {
         return Ok(());
     }
@@ -76,7 +77,7 @@ fn search_fts_books(
              ORDER BY rank
              LIMIT 20",
         )
-        .map_err(|e| e.to_string())?;
+        ?;
 
     let rows = stmt
         .query_map(rusqlite::params![tokenized], |row| {
@@ -92,7 +93,7 @@ fn search_fts_books(
                 color: None,
             })
         })
-        .map_err(|e| e.to_string())?;
+        ?;
 
     for row in rows {
         if let Ok(r) = row {
@@ -107,7 +108,7 @@ fn search_fts_chapters(
     tokenized: &str,
     scope: &str,
     results: &mut Vec<SearchResult>,
-) -> Result<(), String> {
+) -> AppResult<()> {
     if scope != "all" && scope != "content" {
         return Ok(());
     }
@@ -122,7 +123,7 @@ fn search_fts_chapters(
              ORDER BY rank
              LIMIT 30",
         )
-        .map_err(|e| e.to_string())?;
+        ?;
 
     let rows = stmt
         .query_map(rusqlite::params![tokenized], |row| {
@@ -138,7 +139,7 @@ fn search_fts_chapters(
                 color: None,
             })
         })
-        .map_err(|e| e.to_string())?;
+        ?;
 
     for row in rows {
         if let Ok(r) = row {
@@ -152,7 +153,7 @@ fn search_fts_annotations(
     conn: &rusqlite::Connection,
     tokenized: &str,
     results: &mut Vec<SearchResult>,
-) -> Result<(), String> {
+) -> AppResult<()> {
     let mut stmt = conn
         .prepare(
             "SELECT a.id, a.book_id, a.chapter_id, b.title as book_title,
@@ -167,7 +168,7 @@ fn search_fts_annotations(
              ORDER BY rank
              LIMIT 30",
         )
-        .map_err(|e| e.to_string())?;
+        ?;
 
     let rows = stmt
         .query_map(rusqlite::params![tokenized], |row| {
@@ -184,7 +185,7 @@ fn search_fts_annotations(
                 color: row.get(6)?,
             })
         })
-        .map_err(|e| e.to_string())?;
+        ?;
 
     for row in rows {
         if let Ok(r) = row {
@@ -200,7 +201,7 @@ fn search_pinyin_books(
     conn: &rusqlite::Connection,
     query: &str,
     results: &mut Vec<SearchResult>,
-) -> Result<(), String> {
+) -> AppResult<()> {
     let like = format!("%{}%", query.replace(" ", ""));
     let mut stmt = conn
         .prepare(
@@ -211,7 +212,7 @@ fn search_pinyin_books(
              ORDER BY b.updated_at DESC
              LIMIT 20",
         )
-        .map_err(|e| e.to_string())?;
+        ?;
 
     let rows = stmt
         .query_map(rusqlite::params![like], |row| {
@@ -227,7 +228,7 @@ fn search_pinyin_books(
                 color: None,
             })
         })
-        .map_err(|e| e.to_string())?;
+        ?;
 
     for row in rows {
         if let Ok(r) = row {
@@ -241,7 +242,7 @@ fn search_pinyin_chapters(
     conn: &rusqlite::Connection,
     query: &str,
     results: &mut Vec<SearchResult>,
-) -> Result<(), String> {
+) -> AppResult<()> {
     let like = format!("%{}%", query.replace(" ", ""));
     let mut stmt = conn
         .prepare(
@@ -253,7 +254,7 @@ fn search_pinyin_chapters(
              ORDER BY f.sort_order
              LIMIT 30",
         )
-        .map_err(|e| e.to_string())?;
+        ?;
 
     let rows = stmt
         .query_map(rusqlite::params![like, like], |row| {
@@ -269,7 +270,7 @@ fn search_pinyin_chapters(
                 color: None,
             })
         })
-        .map_err(|e| e.to_string())?;
+        ?;
 
     for row in rows {
         if let Ok(r) = row {
@@ -286,7 +287,7 @@ pub fn index_chapter(
     chapter_id: &str,
     title: Option<&str>,
     content: &str,
-) -> Result<(), String> {
+) -> AppResult<()> {
     let tokenized_title = title.map(|t| search::tokenize(t));
     let tokenized_content = search::tokenize(content);
     let pinyin_title = title.map(|t| search::to_pinyin_abbr(t)).unwrap_or_default();
@@ -301,14 +302,14 @@ pub fn index_chapter(
             tokenized_content
         ],
     )
-    .map_err(|e| e.to_string())?;
+    ?;
 
     // Store pinyin search text in the chapters table
     conn.execute(
         "UPDATE chapters SET pinyin_title = ?1, pinyin_content = ?2 WHERE id = ?3",
         rusqlite::params![pinyin_title, pinyin_content, chapter_id],
     )
-    .map_err(|e| e.to_string())?;
+    ?;
 
     Ok(())
 }
@@ -317,12 +318,12 @@ pub fn index_chapter(
 pub fn remove_book_from_index(
     conn: &rusqlite::Connection,
     book_id: &str,
-) -> Result<(), String> {
+) -> AppResult<()> {
     conn.execute(
         "DELETE FROM chapters_fts WHERE book_id = ?1",
         rusqlite::params![book_id],
     )
-    .map_err(|e| e.to_string())?;
+    ?;
 
     Ok(())
 }

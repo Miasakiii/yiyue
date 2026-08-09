@@ -1,4 +1,5 @@
-﻿use crate::db::DbConn;
+use crate::error::{AppError, AppResult};
+use crate::db::DbConn;
 use chrono::Local;
 use rusqlite::params;
 use serde::Serialize;
@@ -19,7 +20,7 @@ struct ExportAnnotation {
 fn get_annotations_for_export(
     conn: &rusqlite::Connection,
     book_id: Option<&str>,
-) -> Result<Vec<ExportAnnotation>, String> {
+) -> AppResult<Vec<ExportAnnotation>> {
     let map_row = |row: &rusqlite::Row| -> rusqlite::Result<ExportAnnotation> {
         Ok(ExportAnnotation {
             book_title: row.get(0)?,
@@ -45,11 +46,11 @@ fn get_annotations_for_export(
                  WHERE a.deleted_at IS NULL AND b.deleted_at IS NULL AND a.book_id = ?1
                  ORDER BY b.title, a.created_at",
             )
-            .map_err(|e| e.to_string())?;
+            ?;
 
-        let rows = stmt.query_map(params![bid], map_row).map_err(|e| e.to_string())?;
+        let rows = stmt.query_map(params![bid], map_row)?;
         for row in rows {
-            result.push(row.map_err(|e| e.to_string())?);
+            result.push(row?);
         }
     } else {
         let mut stmt = conn
@@ -61,11 +62,11 @@ fn get_annotations_for_export(
                  WHERE a.deleted_at IS NULL AND b.deleted_at IS NULL
                  ORDER BY b.title, a.created_at",
             )
-            .map_err(|e| e.to_string())?;
+            ?;
 
-        let rows = stmt.query_map([], map_row).map_err(|e| e.to_string())?;
+        let rows = stmt.query_map([], map_row)?;
         for row in rows {
-            result.push(row.map_err(|e| e.to_string())?);
+            result.push(row?);
         }
     }
 
@@ -216,19 +217,19 @@ pub fn export_annotations(
     db: State<'_, DbConn>,
     book_id: Option<String>,
     format: String, // "markdown", "html", "json"
-) -> Result<String, String> {
+) -> AppResult<String> {
     let conn = db.conn.lock();
     let annotations = get_annotations_for_export(&conn, book_id.as_deref())?;
 
     if annotations.is_empty() {
-        return Err("No annotations to export".to_string());
+        return Err(AppError::NotFound("No annotations to export".to_string()));
     }
 
     let content = match format.as_str() {
         "markdown" | "md" => export_markdown(&annotations),
         "html" => export_html(&annotations),
         "json" => export_json(&annotations),
-        _ => return Err(format!("Unsupported format: {}", format)),
+        _ => return Err(AppError::InvalidInput(format!("Unsupported format: {}", format))),
     };
 
     Ok(content)
@@ -240,7 +241,7 @@ pub fn get_export_filename(
     db: State<'_, DbConn>,
     book_id: Option<String>,
     format: String,
-) -> Result<String, String> {
+) -> AppResult<String> {
     let conn = db.conn.lock();
 
     let book_name = if let Some(ref bid) = book_id {

@@ -1,4 +1,4 @@
-use crate::error::sanitize_error;
+use crate::error::{sanitize_error, AppError, AppResult};
 use crate::models::{ComicChapter, ComicMetadata, ComicPage};
 use std::fs;
 use std::io::Read;
@@ -57,22 +57,22 @@ pub struct ParsedComic {
 }
 
 /// Parse a CBZ file. Extracts images to cache directory.
-pub fn parse_cbz(cbz_path: &Path, cache_dir: &Path) -> Result<ParsedComic, String> {
-    let file = fs::File::open(cbz_path).map_err(|e| sanitize_error(format!("Failed to open CBZ: {}", e)))?;
-    let mut archive = zip::ZipArchive::new(file).map_err(|e| sanitize_error(format!("Failed to read ZIP: {}", e)))?;
+pub fn parse_cbz(cbz_path: &Path, cache_dir: &Path) -> AppResult<ParsedComic> {
+    let file = fs::File::open(cbz_path).map_err(|e| AppError::Parse(sanitize_error(format!("Failed to open CBZ: {}", e))))?;
+    let mut archive = zip::ZipArchive::new(file).map_err(|e| AppError::Parse(sanitize_error(format!("Failed to read ZIP: {}", e))))?;
 
     let book_hash = {
-        let data = fs::read(cbz_path).map_err(|e| sanitize_error(e.to_string()))?;
+        let data = fs::read(cbz_path).map_err(|e| AppError::Parse(sanitize_error(e.to_string())))?;
         blake3::hash(&data).to_hex().to_string()
     };
 
     let book_cache_dir = cache_dir.join(&book_hash[..2]).join(&book_hash);
-    fs::create_dir_all(&book_cache_dir).map_err(|e| sanitize_error(e.to_string()))?;
+    fs::create_dir_all(&book_cache_dir).map_err(|e| AppError::Parse(sanitize_error(e.to_string())))?;
 
     // Collect image entries
     let mut image_entries: Vec<(String, usize)> = Vec::new();
     for i in 0..archive.len() {
-        let entry = archive.by_index(i).map_err(|e| e.to_string())?;
+        let entry = archive.by_index(i).map_err(|e| AppError::Parse(sanitize_error(e.to_string())))?;
         let name = entry.name().to_string();
         if !is_safe_entry_path(&name) {
             continue; // Skip entries with path traversal attempts
@@ -90,7 +90,7 @@ pub fn parse_cbz(cbz_path: &Path, cache_dir: &Path) -> Result<ParsedComic, Strin
     });
 
     if image_entries.is_empty() {
-        return Err("No images found in CBZ file".to_string());
+        return Err(AppError::Parse("No images found in CBZ file".to_string()));
     }
 
     // Extract images
@@ -98,9 +98,9 @@ pub fn parse_cbz(cbz_path: &Path, cache_dir: &Path) -> Result<ParsedComic, Strin
     let mut cover_path = None;
 
     for (page_index, (name, entry_index)) in image_entries.iter().enumerate() {
-        let mut entry = archive.by_index(*entry_index).map_err(|e| sanitize_error(e.to_string()))?;
+        let mut entry = archive.by_index(*entry_index).map_err(|e| AppError::Parse(sanitize_error(e.to_string())))?;
         let mut buffer = Vec::new();
-        entry.read_to_end(&mut buffer).map_err(|e| sanitize_error(e.to_string()))?;
+        entry.read_to_end(&mut buffer).map_err(|e| AppError::Parse(sanitize_error(e.to_string())))?;
 
         // Get image dimensions
         let (width, height) = get_image_dimensions(&buffer);
@@ -113,7 +113,7 @@ pub fn parse_cbz(cbz_path: &Path, cache_dir: &Path) -> Result<ParsedComic, Strin
             .unwrap_or("jpg");
         let cached_name = format!("{:04}.{}", page_index, ext);
         let cached_path = book_cache_dir.join(&cached_name);
-        fs::write(&cached_path, &buffer).map_err(|e| sanitize_error(e.to_string()))?;
+        fs::write(&cached_path, &buffer).map_err(|e| AppError::Parse(sanitize_error(e.to_string())))?;
 
         if page_index == 0 {
             cover_path = Some(cached_path.to_string_lossy().to_string());
@@ -165,9 +165,9 @@ pub fn parse_cbz(cbz_path: &Path, cache_dir: &Path) -> Result<ParsedComic, Strin
 }
 
 /// Parse a folder of images as a comic.
-pub fn parse_folder(folder_path: &Path, cache_dir: &Path) -> Result<ParsedComic, String> {
+pub fn parse_folder(folder_path: &Path, cache_dir: &Path) -> AppResult<ParsedComic> {
     let entries: Vec<_> = fs::read_dir(folder_path)
-        .map_err(|e| sanitize_error(e.to_string()))?
+        .map_err(|e| AppError::Parse(sanitize_error(e.to_string())))?
         .filter_map(|e| e.ok())
         .filter(|e| {
             e.file_type().map(|ft| ft.is_file()).unwrap_or(false)
@@ -179,7 +179,7 @@ pub fn parse_folder(folder_path: &Path, cache_dir: &Path) -> Result<ParsedComic,
         .collect();
 
     if entries.is_empty() {
-        return Err("No images found in folder".to_string());
+        return Err(AppError::Parse("No images found in folder".to_string()));
     }
 
     let book_hash = {
@@ -190,7 +190,7 @@ pub fn parse_folder(folder_path: &Path, cache_dir: &Path) -> Result<ParsedComic,
     };
 
     let book_cache_dir = cache_dir.join(&book_hash[..2]).join(&book_hash);
-    fs::create_dir_all(&book_cache_dir).map_err(|e| sanitize_error(e.to_string()))?;
+    fs::create_dir_all(&book_cache_dir).map_err(|e| AppError::Parse(sanitize_error(e.to_string())))?;
 
     // Sort entries naturally
     let mut sorted_entries: Vec<_> = entries.into_iter().collect();
@@ -205,7 +205,7 @@ pub fn parse_folder(folder_path: &Path, cache_dir: &Path) -> Result<ParsedComic,
 
     for (page_index, entry) in sorted_entries.iter().enumerate() {
         let path = entry.path();
-        let buffer = fs::read(&path).map_err(|e| sanitize_error(e.to_string()))?;
+        let buffer = fs::read(&path).map_err(|e| AppError::Parse(sanitize_error(e.to_string())))?;
         let (width, height) = get_image_dimensions(&buffer);
 
         let ext = path
@@ -214,7 +214,7 @@ pub fn parse_folder(folder_path: &Path, cache_dir: &Path) -> Result<ParsedComic,
             .unwrap_or("jpg");
         let cached_name = format!("{:04}.{}", page_index, ext);
         let cached_path = book_cache_dir.join(&cached_name);
-        fs::write(&cached_path, &buffer).map_err(|e| sanitize_error(e.to_string()))?;
+        fs::write(&cached_path, &buffer).map_err(|e| AppError::Parse(sanitize_error(e.to_string())))?;
 
         if page_index == 0 {
             cover_path = Some(cached_path.to_string_lossy().to_string());
@@ -261,25 +261,25 @@ pub fn parse_folder(folder_path: &Path, cache_dir: &Path) -> Result<ParsedComic,
 }
 
 /// Parse a CBR (RAR) file. Extracts images to cache directory.
-pub fn parse_cbr(cbr_path: &Path, cache_dir: &Path) -> Result<ParsedComic, String> {
+pub fn parse_cbr(cbr_path: &Path, cache_dir: &Path) -> AppResult<ParsedComic> {
     let book_hash = {
-        let data = fs::read(cbr_path).map_err(|e| sanitize_error(format!("Failed to read CBR: {}", e)))?;
+        let data = fs::read(cbr_path).map_err(|e| AppError::Parse(sanitize_error(format!("Failed to read CBR: {}", e))))?;
         blake3::hash(&data).to_hex().to_string()
     };
 
     let book_cache_dir = cache_dir.join(&book_hash[..2]).join(&book_hash);
-    fs::create_dir_all(&book_cache_dir).map_err(|e| sanitize_error(e.to_string()))?;
+    fs::create_dir_all(&book_cache_dir).map_err(|e| AppError::Parse(sanitize_error(e.to_string())))?;
 
     // Extract RAR entries to cache directory
     let mut archive = unrar::Archive::new(cbr_path)
         .open_for_processing()
-        .map_err(|e| sanitize_error(format!("Failed to open CBR: {}", e)))?;
+        .map_err(|e| AppError::Parse(sanitize_error(format!("Failed to open CBR: {}", e))))?;
 
     let mut image_entries: Vec<(String, PathBuf)> = Vec::new();
 
     while let Some(header) = archive
         .read_header()
-        .map_err(|e| sanitize_error(format!("Failed to read CBR header: {}", e)))?
+        .map_err(|e| AppError::Parse(sanitize_error(format!("Failed to read CBR header: {}", e))))?
     {
         let filename = header.entry().filename.to_string_lossy().to_string();
 
@@ -287,7 +287,7 @@ pub fn parse_cbr(cbr_path: &Path, cache_dir: &Path) -> Result<ParsedComic, Strin
         if !is_safe_entry_path(&filename) {
             archive = header
                 .skip()
-                .map_err(|e| sanitize_error(format!("Failed to skip CBR entry: {}", e)))?;
+                .map_err(|e| AppError::Parse(sanitize_error(format!("Failed to skip CBR entry: {}", e))))?;
             continue;
         }
 
@@ -303,13 +303,13 @@ pub fn parse_cbr(cbr_path: &Path, cache_dir: &Path) -> Result<ParsedComic, Strin
 
             archive = header
                 .extract_to(&cached_path)
-                .map_err(|e| sanitize_error(format!("Failed to extract CBR entry: {}", e)))?;
+                .map_err(|e| AppError::Parse(sanitize_error(format!("Failed to extract CBR entry: {}", e))))?;
 
             image_entries.push((filename, cached_path));
         } else {
             archive = header
                 .skip()
-                .map_err(|e| sanitize_error(format!("Failed to skip CBR entry: {}", e)))?;
+                .map_err(|e| AppError::Parse(sanitize_error(format!("Failed to skip CBR entry: {}", e))))?;
         }
     }
 
@@ -321,7 +321,7 @@ pub fn parse_cbr(cbr_path: &Path, cache_dir: &Path) -> Result<ParsedComic, Strin
     });
 
     if image_entries.is_empty() {
-        return Err("No images found in CBR file".to_string());
+        return Err(AppError::Parse("No images found in CBR file".to_string()));
     }
 
     // Rename files to match sorted order and build pages
@@ -329,7 +329,7 @@ pub fn parse_cbr(cbr_path: &Path, cache_dir: &Path) -> Result<ParsedComic, Strin
     let mut cover_path = None;
 
     for (page_index, (name, cached_path)) in image_entries.iter().enumerate() {
-        let buffer = fs::read(cached_path).map_err(|e| sanitize_error(e.to_string()))?;
+        let buffer = fs::read(cached_path).map_err(|e| AppError::Parse(sanitize_error(e.to_string())))?;
         let (width, height) = get_image_dimensions(&buffer);
 
         let ext = cached_path
@@ -341,7 +341,7 @@ pub fn parse_cbr(cbr_path: &Path, cache_dir: &Path) -> Result<ParsedComic, Strin
 
         // Rename if needed (only when order changed)
         if cached_path != &sorted_path {
-            fs::rename(cached_path, &sorted_path).map_err(|e| sanitize_error(e.to_string()))?;
+            fs::rename(cached_path, &sorted_path).map_err(|e| AppError::Parse(sanitize_error(e.to_string())))?;
         }
 
         if page_index == 0 {
