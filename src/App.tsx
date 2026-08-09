@@ -9,6 +9,7 @@ import { SyncSettings } from "./pages/SyncSettings";
 import { Rules } from "./pages/Rules";
 import { OpdsSettings } from "./pages/OpdsSettings";
 import { LanTransfer } from "./pages/LanTransfer";
+import { SourceBooks } from "./pages/SourceBooks";
 import { SearchPanel } from "./components/SearchPanel";
 import { TitleBar } from "./components/TitleBar";
 import { ToastContainer } from "./components/Toast";
@@ -88,6 +89,7 @@ function App() {
           <Route path="/sync" element={<SyncSettings />} />
           <Route path="/rules" element={<Rules />} />
           <Route path="/opds" element={<OpdsSettings />} />
+          <Route path="/source" element={<SourceBooks />} />
           <Route path="/transfer" element={<LanTransfer />} />
           <Route
             path="/reader"

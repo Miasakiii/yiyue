@@ -73,6 +73,8 @@ pub fn run() {
             commands::search::search_all,
             commands::export::export_annotations,
             commands::export::get_export_filename,
+            commands::gutenberg::search_gutenberg,
+            commands::gutenberg::download_gutenberg_book,
             commands::stats::record_reading_session,
             commands::stats::get_reading_stats,
             commands::stats::get_daily_stats,

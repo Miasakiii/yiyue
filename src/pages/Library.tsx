@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { BarChart3, Book, BookOpen, ChevronDown, ChevronLeft, FileText, Folder, Globe, LayoutGrid, List, Moon, Plus, Radio, Search, Star, Sun, Upload, X } from "lucide-react";
+import { BarChart3, Book, BookOpen, ChevronDown, ChevronLeft, FileText, Folder, Globe, LayoutGrid, LibraryBig, List, Moon, Plus, Radio, Search, Star, Sun, Upload, X } from "lucide-react";
 import type { ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAppStore } from "../stores/app";
@@ -50,6 +50,13 @@ const MORE_MENU: { label: string; path: string; icon: ReactNode }[] = [
     path: "/opds",
     icon: (
 <Radio size={ 13 } strokeWidth={2} />
+    ),
+  },
+  {
+    label: "书源",
+    path: "/source",
+    icon: (
+      <LibraryBig size={13} strokeWidth={2} />
     ),
   },
   {

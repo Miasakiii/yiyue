@@ -4,6 +4,7 @@ pub mod bookmarks;
 pub mod books;
 pub mod dict;
 pub mod export;
+pub mod gutenberg;
 pub mod import;
 pub mod metadata;
 pub mod opds;
