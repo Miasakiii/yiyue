@@ -51,7 +51,8 @@ CI 门禁：`.github/workflows/ci.yml` 在 push/PR 时按变更区域运行前�
 - **HTML sanitize**：`Reader.tsx` 对 Markdown 内容使用 `DOMPurify.sanitize()`。`SearchPanel.tsx` 已改用 `DOMPurify.sanitize(html, { ALLOWED_TAGS: ['mark'] })` 清洗搜索摘要。
 - **WebDAV 密码已迁入系统凭据**：`settings` 表中不再明文存储密码，改用 `keyring` crate 存入 OS 凭据管理器。修改同步模块时不得在日志或前端代码中暴露密码。
 - **`get_book_groups` 已被前端调用**：`BookCard.tsx` 通过 `stores/app.ts` 的 `getBookGroups` action 展示/设置书籍分组。
-- **thiserror 迁移中（棘轮守护）**：`error.rs` 已定义 `AppError` 枚举，OPDS 模块率先迁移。新增 Rust 模块时优先使用 `AppResult<T>`，避免继续扩散 `Result<T, String>`。`src-tauri/tests/error_ratchet.rs` 会统计 `src/` 中旧式 `Result<T, String>` 数量并与 `tests/error_ratchet_baseline.json` 基线比对：数量上升即 `cargo test` 失败；完成一批迁移后运行 `UPDATE_ERROR_RATCHET=1 cargo test --test error_ratchet` 下调基线。
+- **thiserror 迁移已完成**：`error.rs` 的 `AppError` 为唯一错误类型（`AppResult<T>`），旧式 `Result<T, String>` 已被棘轮清零（基线 `{}`）。新增代码一律使用 `AppResult<T>`，不得回归 `Result<T, String>`。
+- **日志格式契约**：非平凡操作（批量循环、外部 API 调用、多步 DB 写入、文件系统操作、后台任务、破坏性操作）使用 `src-tauri/src/logging.rs` 的 `log_start` / `log_end` / `log_fail`，格式 `[event] [phase] key=value ... - message`（event 稳定唯一，phase 为 start/end/fail，主键 ID 在前，动态值自动 sanitize，单行，不打印密钥/大块内容）。
 - **Reader.tsx 已拆分**：原 1138 行拆分为 `reader/` 子组件（ReaderSettings、ReaderSidebar、ReaderStatusBar、ReaderContent、helpers、constants）+ `hooks/useReaderKeyboard.ts`。Reader.tsx 现为 ~670 行编排层。修改阅读器功能时需注意组件边界。
 
 ## 架构要点

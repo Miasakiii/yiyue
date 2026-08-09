@@ -58,6 +58,7 @@ pub async fn import_book(
     file_path: String,
     encoding: Option<String>,
 ) -> AppResult<ImportResult> {
+    let started = std::time::Instant::now();
     let path = Path::new(&file_path).to_path_buf();
     if !path.exists() {
         return Err(AppError::NotFound("File not found".to_string()));
@@ -65,6 +66,7 @@ pub async fn import_book(
 
     let format = get_format(&path);
     let file_size = fs::metadata(&path)?.len() as i64;
+    crate::logging::log_start("book.import", &[("path", &file_path), ("format", &format)], "import started");
 
     // Check for duplicates (quick DB read — hold lock briefly)
     let file_hash = compute_hash(&path)?;
@@ -361,6 +363,12 @@ pub async fn import_book(
         }
     }; // DB lock released
 
+    crate::logging::log_end(
+        "book.import",
+        &[("path", &file_path), ("bookId", &book.id)],
+        started.elapsed().as_millis(),
+        "import completed",
+    );
     Ok(ImportResult {
         book,
         warnings: Vec::new(),

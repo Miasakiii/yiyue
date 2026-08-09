@@ -1,6 +1,7 @@
 mod commands;
 mod db;
 mod error;
+mod logging;
 mod models;
 mod opds;
 mod parser;
