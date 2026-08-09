@@ -87,6 +87,7 @@ pub fn run() {
             commands::stats::get_reading_speed,
             commands::stats::get_reading_goal,
             commands::stats::save_reading_goal,
+            commands::stats::get_weekly_report,
             commands::rules::get_rules,
             commands::rules::get_rule_groups,
             commands::rules::create_rule,

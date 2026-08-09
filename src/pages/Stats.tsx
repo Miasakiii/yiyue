@@ -36,6 +36,24 @@ const ACHIEVEMENT_ICONS: Record<string, React.ComponentType<{ size?: number; sty
   Medal, Flame, Crown, BookOpenText, Repeat, LibraryBig, Landmark, Image,
 };
 
+interface WeekSummary {
+  duration_ms: number;
+  chars_read: number;
+  days: number;
+  books_finished: number;
+  annotations: number;
+}
+
+interface WeeklyReport {
+  week_start: string;
+  current: WeekSummary;
+  previous: WeekSummary | null;
+}
+
+function fmtHours(ms: number): string {
+  return (ms / 3600000).toFixed(1).replace(/\.0$/, "");
+}
+
 interface BookStats {
   book_id: string;
   book_title: string;
@@ -63,6 +81,7 @@ export function Stats() {
   const [dailyStats, setDailyStats] = useState<DailyStats[]>([]);
   const [bookStats, setBookStats] = useState<BookStats[]>([]);
   const [achievements, setAchievements] = useState<Achievement[]>([]);
+  const [weekly, setWeekly] = useState<WeeklyReport | null>(null);
   const [error, setError] = useState("");
 
   useEffect(() => {
@@ -72,16 +91,18 @@ export function Stats() {
   const loadData = async () => {
     setError("");
     try {
-      const [s, d, b, a] = await Promise.all([
+      const [s, d, b, a, w] = await Promise.all([
         invoke<ReadingStats>("get_reading_stats"),
         invoke<DailyStats[]>("get_daily_stats", { days: 90 }),
         invoke<BookStats[]>("get_book_stats"),
         invoke<Achievement[]>("get_achievements"),
+        invoke<WeeklyReport>("get_weekly_report"),
       ]);
       setStats(s);
       setDailyStats(d);
       setBookStats(b);
       setAchievements(a);
+      setWeekly(w);
     } catch (e) {
       console.error("Failed to load stats:", e);
       setError("加载统计数据失败，请重试");
@@ -284,6 +305,49 @@ export function Stats() {
                       </div>
                     </div>
                   ))}
+                </div>
+              </div>
+            )}
+
+            {/* Weekly report */}
+            {weekly && (
+              <div
+                className="rounded-xl p-6"
+                style={{
+                  background: "var(--bg-secondary)",
+                  border: "1px solid var(--border-light)",
+                }}
+              >
+                <h2 className="text-sm font-semibold mb-4">本周阅读</h2>
+                <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+                  {[
+                    { label: "时长", now: `${fmtHours(weekly.current.duration_ms)}h`, prev: weekly.previous?.duration_ms ?? 0, unit: "h", fmt: (v: number) => fmtHours(v) },
+                    { label: "字数", now: formatChars(weekly.current.chars_read), prev: weekly.previous?.chars_read ?? 0, unit: "字", fmt: (v: number) => formatChars(v) },
+                    { label: "阅读天数", now: `${weekly.current.days}天`, prev: weekly.previous?.days ?? 0, unit: "天", fmt: (v: number) => `${v}天` },
+                    { label: "读完", now: `${weekly.current.books_finished}本`, prev: weekly.previous?.books_finished ?? 0, unit: "本", fmt: (v: number) => `${v}本` },
+                    { label: "新划线", now: `${weekly.current.annotations}条`, prev: weekly.previous?.annotations ?? 0, unit: "条", fmt: (v: number) => `${v}条` },
+                  ].map((item) => {
+                    const diff = weekly.previous
+                      ? (item.label === "时长" ? weekly.current.duration_ms - (item.prev as number) : (item.label === "字数" ? weekly.current.chars_read - (item.prev as number) : (item.label === "阅读天数" ? weekly.current.days - (item.prev as number) : (item.label === "读完" ? weekly.current.books_finished - (item.prev as number) : weekly.current.annotations - (item.prev as number)))))
+                      : 0;
+                    const up = diff > 0;
+                    const flat = diff === 0;
+                    return (
+                      <div
+                        key={item.label}
+                        className="rounded-lg p-3"
+                        style={{ background: "var(--bg-primary)", border: "1px solid var(--border-light)" }}
+                      >
+                        <div className="text-xs" style={{ color: "var(--text-tertiary)" }}>{item.label}</div>
+                        <div className="text-lg font-semibold mt-1 tabular-nums">{item.now}</div>
+                        <div className="text-xs mt-0.5 tabular-nums" style={{ color: flat ? "var(--text-tertiary)" : up ? "var(--success)" : "var(--error)" }}>
+                          {weekly.previous
+                            ? `${up ? "▲" : flat ? "—" : "▼"} ${item.fmt(Math.abs(diff))} vs 上周`
+                            : "暂无上周数据"}
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             )}

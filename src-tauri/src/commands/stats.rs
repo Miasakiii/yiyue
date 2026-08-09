@@ -342,3 +342,89 @@ pub fn save_reading_goal(db: State<'_, DbConn>, goal: i64) -> AppResult<()> {
     .map_err(AppError::Sqlite)?;
     Ok(())
 }
+
+/* ---------- 阅读周报（FUTURE 5.1.3 延伸） ---------- */
+
+#[derive(Debug, Serialize, Default)]
+pub struct WeekSummary {
+    pub duration_ms: i64,
+    pub chars_read: i64,
+    pub days: i64,
+    pub books_finished: i64,
+    pub annotations: i64,
+}
+
+#[derive(Debug, Serialize)]
+pub struct WeeklyReport {
+    pub week_start: String,
+    pub current: WeekSummary,
+    pub previous: Option<WeekSummary>,
+}
+
+fn week_summary(conn: &rusqlite::Connection, week_start: &str) -> AppResult<WeekSummary> {
+    let mut s = WeekSummary::default();
+    // 阅读时长/字数/天数（与 get_weekly_stats 同一周起始口径）
+    let row = conn
+        .query_row(
+            "SELECT COALESCE(SUM(duration_ms),0), COALESCE(SUM(chars_read),0), COUNT(DISTINCT date(start_time))
+             FROM reading_sessions
+             WHERE date(start_time, 'weekday 0', '-6 days') = ?1",
+            params![week_start],
+            |r| {
+                Ok((
+                    r.get::<_, i64>(0)?,
+                    r.get::<_, i64>(1)?,
+                    r.get::<_, i64>(2)?,
+                ))
+            },
+        )
+        .map_err(AppError::Sqlite)?;
+    s.duration_ms = row.0;
+    s.chars_read = row.1;
+    s.days = row.2;
+    // 本周读完的书
+    s.books_finished = conn
+        .query_row(
+            "SELECT COUNT(*) FROM reading_progress
+             WHERE percentage >= 100 AND date(last_read_at, 'weekday 0', '-6 days') = ?1",
+            params![week_start],
+            |r| r.get(0),
+        )
+        .map_err(AppError::Sqlite)?;
+    // 本周新增划线/笔记
+    s.annotations = conn
+        .query_row(
+            "SELECT COUNT(*) FROM annotations
+             WHERE date(created_at, 'weekday 0', '-6 days') = ?1",
+            params![week_start],
+            |r| r.get(0),
+        )
+        .map_err(AppError::Sqlite)?;
+    Ok(s)
+}
+
+/// IPC：阅读周报（本周 vs 上周，用于统计页聚合展示）。
+#[tauri::command]
+pub fn get_weekly_report(db: State<'_, DbConn>) -> AppResult<WeeklyReport> {
+    let conn = db.conn.lock();
+    let this_week = conn
+        .query_row("SELECT date('now', 'weekday 0', '-6 days')", [], |r| {
+            r.get::<_, String>(0)
+        })
+        .map_err(AppError::Sqlite)?;
+    // 上周 = 本周 - 7 天
+    let prev_week = conn
+        .query_row(
+            "SELECT date(?1, '-7 days')",
+            params![this_week],
+            |r| r.get::<_, String>(0),
+        )
+        .map_err(AppError::Sqlite)?;
+    let current = week_summary(&conn, &this_week)?;
+    let previous = week_summary(&conn, &prev_week)?;
+    Ok(WeeklyReport {
+        week_start: this_week,
+        current,
+        previous: Some(previous),
+    })
+}
