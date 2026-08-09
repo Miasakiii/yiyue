@@ -66,6 +66,8 @@ pub fn run() {
             commands::annotations::create_annotation,
             commands::annotations::update_annotation,
             commands::annotations::delete_annotation,
+            commands::calibre::detect_calibre,
+            commands::calibre::convert_book,
             commands::backup::export_all_data,
             commands::backup::import_all_data,
             commands::bookmarks::get_bookmarks,

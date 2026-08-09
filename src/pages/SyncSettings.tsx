@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { AlertCircle, Archive, BookOpen, Download, Eye, Globe, Info, RefreshCw, Upload } from "lucide-react";
+import { AlertCircle, Archive, BookMarked, BookOpen, Download, Eye, Globe, Info, RefreshCw, Upload } from "lucide-react";
 import { invoke } from "@tauri-apps/api/core";
 import { useAppStore } from "../stores/app";
 import { PageHeader, Button, Input, Switch, Dialog } from "../components/ui";
@@ -43,6 +43,8 @@ export function SyncSettings() {
   const [confirmImport, setConfirmImport] = useState(false);
   const [importPath, setImportPath] = useState("");
   const [importing, setImporting] = useState(false);
+  const [calibre, setCalibre] = useState<{ available: boolean; path: string | null; version: string | null } | null>(null);
+  const [converting, setConverting] = useState(false);
 
   useEffect(() => {
     loadData();
@@ -50,14 +52,16 @@ export function SyncSettings() {
 
   const loadData = async () => {
     try {
-      const [c, s, m] = await Promise.all([
+      const [c, s, m, cal] = await Promise.all([
         invoke<WebDavConfig>("get_webdav_config"),
         invoke<SyncStatus>("get_sync_status"),
         invoke<boolean>("get_metadata_setting"),
+        invoke<{ available: boolean; path: string | null; version: string | null }>("detect_calibre"),
       ]);
       setConfig(c);
       setStatus(s);
       setMetaEnabled(m);
+      setCalibre(cal);
     } catch (e) {
       console.error("Failed to load sync config:", e);
     }
@@ -138,6 +142,32 @@ export function SyncSettings() {
       showToast(`导入失败: ${String(e)}`, "error");
     } finally {
       setImporting(false);
+    }
+  };
+
+  const handleCalibreConvert = async (fmt: "txt" | "epub") => {
+    if (!calibre?.path) return;
+    try {
+      const { open } = await import("@tauri-apps/plugin-dialog");
+      const path = await open({
+        multiple: false,
+        filters: [
+          { name: "电子书", extensions: ["azw3", "mobi", "azw", "rtf", "lit", "htm", "html"] },
+        ],
+      });
+      if (!path) return;
+      setConverting(true);
+      const out = await invoke<string>("convert_book", {
+        ebookConvertPath: calibre.path,
+        inputPath: path,
+        outputFormat: fmt,
+      });
+      await useAppStore.getState().importBook(out);
+      showToast(`转换并导入成功（${fmt.toUpperCase()}）`, "success");
+    } catch (e) {
+      showToast(`转换失败: ${String(e)}`, "error");
+    } finally {
+      setConverting(false);
     }
   };
 
@@ -489,6 +519,55 @@ export function SyncSettings() {
             <p className="mt-3 text-xs" style={{ color: "var(--text-tertiary)" }}>
               导出内容：书籍元数据、章节、笔记划线、书签、进度、标签分组、规则、成就、设置（不含书籍源文件，library/ 目录请另行备份）。
             </p>
+          </div>
+
+          {/* Calibre bridge card (PLAN 3.4.4) */}
+          <div
+            className="rounded-xl p-5"
+            style={{
+              background: "var(--bg-secondary)",
+              border: "1px solid var(--border-light)",
+            }}
+          >
+            <h2 className="text-sm font-semibold mb-4 flex items-center gap-2">
+              <BookMarked size={16} strokeWidth={2} />
+              Calibre 桥接
+            </h2>
+            {calibre === null ? (
+              <div className="text-sm" style={{ color: "var(--text-tertiary)" }}>
+                检测中…
+              </div>
+            ) : calibre.available ? (
+              <div className="space-y-3">
+                <div className="text-sm flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-full" style={{ background: "var(--success)" }} />
+                  <span>已检测到 Calibre（ebook-convert）</span>
+                  {calibre.version && (
+                    <span className="text-xs" style={{ color: "var(--text-tertiary)" }}>
+                      {calibre.version}
+                    </span>
+                  )}
+                </div>
+                <div className="flex items-center gap-2">
+                  <Button variant="secondary" size="sm" disabled={converting} onClick={() => handleCalibreConvert("txt")}>
+                    <Download size={13} strokeWidth={2} />
+                    {converting ? "转换中…" : "转换 AZW3/MOBI → TXT"}
+                  </Button>
+                  <Button variant="secondary" size="sm" disabled={converting} onClick={() => handleCalibreConvert("epub")}>
+                    <Download size={13} strokeWidth={2} />
+                    转换 → EPUB
+                  </Button>
+                </div>
+                <p className="text-xs" style={{ color: "var(--text-tertiary)" }}>
+                  选择不支持格式的书籍（azw3/mobi/azw/rtf 等），转换后自动导入书库。
+                </p>
+              </div>
+            ) : (
+              <div className="text-sm" style={{ color: "var(--text-secondary)" }}>
+                未检测到 Calibre。安装后（<span className="font-mono text-xs">calibre.app</span>）重启应用即可启用格式转换；
+                也可设置环境变量 <span className="font-mono text-xs">CALIBRE_PATH</span> 指向 ebook-convert。
+              </div>
+            )}
           </div>
         </div>
       </main>
