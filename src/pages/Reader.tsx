@@ -15,6 +15,12 @@ import { ReaderContent } from "./reader/ReaderContent";
 import type { SaveReadingProfile, Bookmark } from "../types";
 
 import { FONT_FAMILIES, CONTENT_WIDTH_PRESETS, PRESETS, type Preset } from "./reader/constants";
+import {
+  scrollContentToJump,
+  stashPendingChapterJump,
+  takePendingChapterJump,
+  type ChapterJumpTarget,
+} from "./reader/jump";
 
 /* ---------- Component ---------- */
 export function Reader() {
@@ -507,36 +513,18 @@ export function Reader() {
     tryTurnPage,
   });
 
-  /* ---- Restore scroll / pending search jump ---- */
+  /* ---- Restore scroll / pending search·note jump ---- */
   useEffect(() => {
     if (!content || !currentChapter || !contentRef.current) return;
 
-    const PENDING_KEY = "yiyue.pendingSearchJump";
-    const raw = sessionStorage.getItem(PENDING_KEY);
-    if (raw) {
-      try {
-        const pending = JSON.parse(raw) as { chapterId?: string; matchedText?: string };
-        if (pending.chapterId && pending.chapterId !== currentChapter.id) {
-          // Wait until the target chapter content is loaded
-          return;
-        }
-        sessionStorage.removeItem(PENDING_KEY);
-        const needle = (pending.matchedText || "").trim();
-        if (needle) {
-          const article = contentRef.current.querySelector("article");
-          const text = article?.textContent || "";
-          const idx = text.indexOf(needle);
-          if (idx >= 0 && text.length > 0) {
-            const ratio = Math.min(idx / text.length, 1);
-            const { max } = scrollAxis(contentRef.current);
-            if (readingMode === "columns") contentRef.current.scrollLeft = ratio * max;
-            else contentRef.current.scrollTop = ratio * max;
-            return;
-          }
-        }
-      } catch {
-        sessionStorage.removeItem(PENDING_KEY);
-      }
+    const pending = takePendingChapterJump(currentChapter.id);
+    if (pending) {
+      const ok = scrollContentToJump(contentRef.current, {
+        matchedText: pending.matchedText,
+        charOffset: pending.charOffset,
+        columns: readingMode === "columns",
+      });
+      if (ok) return;
     }
 
     // Only restore scroll if progress matches the current chapter
@@ -557,26 +545,25 @@ export function Reader() {
     useAppStore.getState().closeBook();
     navigate("/");
   };
-  const handleJumpTo = (chapterId: string, offset: number) => {
-    loadChapter(chapterId).then(() => {
-      // After content loads, try to scroll to the annotation offset
-      // Use a small delay to ensure DOM is ready
-      setTimeout(() => {
+
+  const handleJumpTo = useCallback((target: ChapterJumpTarget) => {
+    setShowNotes(false);
+    // Same chapter already on screen — jump immediately (prefer matchedText).
+    if (currentChapter?.id === target.chapterId && content && contentRef.current) {
+      requestAnimationFrame(() => {
         if (!contentRef.current) return;
-        const el = contentRef.current;
-        const article = el.querySelector("article");
-        if (!article) return;
-        // Approximate: offset is char index, estimate position by ratio
-        const totalChars = article.textContent?.length || 1;
-        const ratio = Math.min(offset / totalChars, 1);
-        if (readingMode === "columns") {
-          el.scrollLeft = ratio * (el.scrollWidth - el.clientWidth);
-        } else {
-          el.scrollTop = ratio * (el.scrollHeight - el.clientHeight);
-        }
-      }, 100);
-    });
-  };
+        scrollContentToJump(contentRef.current, {
+          matchedText: target.matchedText,
+          charOffset: target.charOffset,
+          columns: readingMode === "columns",
+        });
+      });
+      return;
+    }
+    // Cross-chapter: stash for the content-load effect, then switch chapter.
+    stashPendingChapterJump(target);
+    loadChapter(target.chapterId);
+  }, [content, currentChapter?.id, loadChapter, readingMode]);
 
   /* ---- Early returns ---- */
   if (!currentBook) {

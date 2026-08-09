@@ -3,6 +3,7 @@ import { BookOpen, Clock, FileText, Search } from "lucide-react";
 import { invoke } from "@tauri-apps/api/core";
 import DOMPurify from "dompurify";
 import { useAppStore } from "../stores/app";
+import { stashPendingChapterJump } from "../pages/reader/jump";
 
 /** Sanitize FTS5 snippet: strip all HTML except <mark> tags */
 function sanitizeSnippet(html: string): string {
@@ -152,13 +153,10 @@ export function SearchPanel({
         result.chapter_id &&
         result.matched_text
       ) {
-        sessionStorage.setItem(
-          "yiyue.pendingSearchJump",
-          JSON.stringify({
-            chapterId: result.chapter_id,
-            matchedText: result.matched_text,
-          }),
-        );
+        stashPendingChapterJump({
+          chapterId: result.chapter_id,
+          matchedText: result.matched_text,
+        });
       }
       await openBook(result.book_id);
       if (result.chapter_id) {

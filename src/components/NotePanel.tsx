@@ -23,7 +23,11 @@ interface NotePanelProps {
   chapterId?: string;
   visible: boolean;
   onClose: () => void;
-  onJumpTo?: (chapterId: string, offset: number) => void;
+  onJumpTo?: (target: {
+    chapterId: string;
+    charOffset?: number;
+    matchedText?: string | null;
+  }) => void;
 }
 
 export function NotePanel({
@@ -376,7 +380,11 @@ export function NotePanel({
                           className="text-xs hover:underline"
                           style={{ color: "var(--accent)" }}
                           onClick={() =>
-                            onJumpTo(annotation.chapter_id!, annotation.start_offset)
+                            onJumpTo({
+                              chapterId: annotation.chapter_id!,
+                              charOffset: annotation.start_offset,
+                              matchedText: annotation.selected_text,
+                            })
                           }
                         >
                           跳转
