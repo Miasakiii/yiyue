@@ -28,16 +28,15 @@ pub fn is_pinyin_query(query: &str) -> bool {
 /// e.g. "中国" -> "zhongguo", "Hello世界" -> "helloshijie"
 /// Non-Chinese characters are preserved as-is (lowercased).
 pub fn to_pinyin_abbr(text: &str) -> String {
-    let args = pinyin::Args::new(); // Style::Normal: plain pinyin without tone marks
+    use pinyin::ToPinyin;
     let mut result = String::new();
     for c in text.chars() {
         if c.is_ascii_alphanumeric() || c.is_whitespace() || c.is_ascii_punctuation() {
             result.push(c.to_ascii_lowercase());
         } else {
-            let mut buf = [0u8; 4];
-            let readings = pinyin::pinyin(c.encode_utf8(&mut buf), &args);
-            if let Some(first) = readings.into_iter().next().and_then(|v| v.into_iter().next()) {
-                result.push_str(&first);
+            // 取第一个读音的无声调形式（pinyin 0.11：ToPinyin 直接实现于 char）
+            if let Some(p) = c.to_pinyin() {
+                result.push_str(p.plain());
             }
         }
         // Characters without pinyin representation are skipped
@@ -95,4 +94,12 @@ mod tests {
         let result = tokenize("Hello世界");
         assert!(result.contains("Hello"));
     }
+
+    #[test]
+    fn test_to_pinyin_abbr_chinese() {
+        // pinyin 0.11 迁移后格式不变："中国" -> 无声调 zhongguo
+        assert_eq!(to_pinyin_abbr("中国"), "zhongguo");
+        assert_eq!(to_pinyin_abbr("Hello世界"), "helloshijie");
+    }
+
 }

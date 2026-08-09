@@ -1,0 +1,28 @@
+# cargo-audit 配置（src-tauri/audit.toml）
+#
+# 以下 advisory 均为 tauri 2 的 Linux GTK3 绑定栈（webkit2gtk 依赖链）：
+# gtk-rs 0.18.x 被标记为 unmaintained / unsound，但 tauri 上游锁定该版本，
+# 无法在项目内升级；这些 crate 仅在 Linux 构建时编译，Windows 构建不受影响。
+# 等待 tauri 升级 GTK4 栈后应移除本文件的 ignore 列表。
+
+[advisories]
+ignore = [
+  "RUSTSEC-2024-0370", # gtk-rs GTK3 no longer maintained
+  "RUSTSEC-2024-0411", # gtk-sys
+  "RUSTSEC-2024-0412", # gtk3-macros
+  "RUSTSEC-2024-0413", # gdk
+  "RUSTSEC-2024-0414", # gdk-sys
+  "RUSTSEC-2024-0415", # gdkwayland-sys
+  "RUSTSEC-2024-0416", # gdkx11
+  "RUSTSEC-2024-0417", # gdkx11-sys
+  "RUSTSEC-2024-0418", # atk
+  "RUSTSEC-2024-0419", # atk-sys
+  "RUSTSEC-2024-0420", # pangocairo / pango 系
+  "RUSTSEC-2024-0429", # glib VariantStrIter unsound（GTK3 栈）
+  "RUSTSEC-2025-0075", # gtk-rs 相关
+  "RUSTSEC-2025-0080", # gtk-rs 相关
+  "RUSTSEC-2025-0081", # gtk-rs 相关
+  "RUSTSEC-2025-0098", # gtk-rs 相关
+  "RUSTSEC-2025-0100", # gtk-rs 相关
+  "RUSTSEC-2026-0192", # GTK 栈新告警
+]
