@@ -7,7 +7,7 @@ mod opds;
 mod parser;
 mod rules;
 mod search;
-mod sync;
+pub mod sync;
 
 use tauri::Manager;
 use commands::rules::seed_preset_rules;
