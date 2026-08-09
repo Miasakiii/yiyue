@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef, useCallback, useMemo } from "react";
-import { BookOpen, ChevronDown, ChevronLeft, ChevronRight, FilePenLine, List, Pause, Play, Settings } from "lucide-react";
+import { BookOpen, ChevronDown, ChevronLeft, ChevronRight, FilePenLine, List, Maximize, Pause, Play, Settings } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { invoke } from "@tauri-apps/api/core";
 import DOMPurify from "dompurify";
@@ -31,6 +31,13 @@ export function Reader() {
   const [charsPerMinute, setCharsPerMinute] = useState(300);
   // 每日目标：settings 表持久化（可 WebDAV 同步）；localStorage 旧值首启迁移
   const [dailyGoal, setDailyGoal] = useState<number>(() => Number(localStorage.getItem("reader-daily-goal")) || 0);
+  // 阅读模式：scroll（滚动）/ columns（分栏分页，横向翻页）
+  const [readingMode, setReadingMode] = useState<"scroll" | "columns">(
+    () => (localStorage.getItem("reader-mode") as "scroll" | "columns") || "scroll",
+  );
+  useEffect(() => {
+    localStorage.setItem("reader-mode", readingMode);
+  }, [readingMode]);
   useEffect(() => {
     invoke<number>("get_reading_goal")
       .then((goal) => {
@@ -380,7 +387,11 @@ export function Reader() {
         setContent(text);
         setLoading(false);
         charsReadRef.current += text.length;
-        if (contentRef.current) contentRef.current.scrollTop = 0;
+        const el = contentRef.current;
+        if (el) {
+          if (readingMode === "columns") el.scrollLeft = 0;
+          else el.scrollTop = 0;
+        }
       })
       .catch((e) => {
         console.error("Failed to load chapter:", e);
@@ -389,11 +400,19 @@ export function Reader() {
   }, [currentChapter, contentVersion]);
 
   /* ---- Save progress on scroll ---- */
+  // 分栏模式为横向滚动：统一滚动轴（pos/max）换算
+  const scrollAxis = useCallback((el: HTMLElement) => {
+    if (readingMode === "columns") {
+      return { pos: el.scrollLeft, max: el.scrollWidth - el.clientWidth };
+    }
+    return { pos: el.scrollTop, max: el.scrollHeight - el.clientHeight };
+  }, [readingMode]);
+
   const handleScroll = useCallback(() => {
     if (!currentBook || !currentChapter || !contentRef.current) return;
     const el = contentRef.current;
-    const scrollHeight = el.scrollHeight - el.clientHeight;
-    const scrollOffset = scrollHeight > 0 ? el.scrollTop / scrollHeight : 0;
+    const { pos, max } = scrollAxis(el);
+    const scrollOffset = max > 0 ? pos / max : 0;
     const chapterIndex = chapters.findIndex((c) => c.id === currentChapter.id);
     const chapterProgress = (chapterIndex + scrollOffset) / chapters.length;
     updateProgress(currentBook.id, {
@@ -401,7 +420,7 @@ export function Reader() {
       scroll_offset: scrollOffset,
       percentage: Math.round(chapterProgress * 100),
     });
-  }, [currentBook, currentChapter, chapters]);
+  }, [currentBook, currentChapter, chapters, scrollAxis]);
 
   const scrollTimeoutRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const onScroll = useCallback(() => {
@@ -456,9 +475,10 @@ export function Reader() {
     // Only restore scroll if progress matches the current chapter
     if (progress.chapter_id !== currentChapter.id) return;
     const el = contentRef.current;
-    const scrollHeight = el.scrollHeight - el.clientHeight;
-    el.scrollTop = progress.scroll_offset * scrollHeight;
-  }, [content, currentChapter, progress]);
+    const { max } = scrollAxis(el);
+    if (readingMode === "columns") el.scrollLeft = progress.scroll_offset * max;
+    else el.scrollTop = progress.scroll_offset * max;
+  }, [content, currentChapter, progress, readingMode, scrollAxis]);
 
   const goToChapter = (chapterId: string) => {
     loadChapter(chapterId);
@@ -482,8 +502,11 @@ export function Reader() {
         // Approximate: offset is char index, estimate position by ratio
         const totalChars = article.textContent?.length || 1;
         const ratio = Math.min(offset / totalChars, 1);
-        const scrollHeight = el.scrollHeight - el.clientHeight;
-        el.scrollTop = ratio * scrollHeight;
+        if (readingMode === "columns") {
+          el.scrollLeft = ratio * (el.scrollWidth - el.clientWidth);
+        } else {
+          el.scrollTop = ratio * (el.scrollHeight - el.clientHeight);
+        }
       }, 100);
     });
   };
@@ -567,6 +590,11 @@ export function Reader() {
               )}
             </ToolbarBtn>
 
+            {/* Fullscreen button */}
+            <ToolbarBtn onClick={toggleFullscreen} title="全屏 (F11)">
+              <Maximize size={14} strokeWidth={2} />
+            </ToolbarBtn>
+
             {/* Settings button */}
             <div className="relative" ref={settingsRef}>
               <ToolbarBtn active={settingsOpen} onClick={() => setSettingsOpen(!settingsOpen)} title="设置">
@@ -581,6 +609,7 @@ export function Reader() {
                   fontFamilyKey={fontFamilyKey} setFontFamilyKey={setFontFamilyKey}
                   contentWidthKey={contentWidthKey} setContentWidthKey={setContentWidthKey}
                   paragraphSpacing={paragraphSpacing} setParagraphSpacing={setParagraphSpacing}
+                  readingMode={readingMode} setReadingMode={setReadingMode}
                   textAlign={textAlign} setTextAlign={setTextAlign}
                   pageAnimation={pageAnimation} setPageAnimation={setPageAnimation}
                   theme={theme} setTheme={setTheme}
@@ -648,6 +677,7 @@ export function Reader() {
           contentWidth={contentWidth}
           textAlign={textAlign}
           paragraphSpacing={paragraphSpacing}
+          readingMode={readingMode}
           animClass={animClass}
           contentRef={contentRef}
           onScroll={onScroll}

@@ -30,7 +30,10 @@ pub fn parse(file_path: &Path, _options: &ParseOptions) -> Result<ParsedDocument
     let mut chapters = Vec::new();
 
     for (i, item_id) in spine.iter().enumerate() {
-        if let Some((content, _mime)) = doc.get_resource_str(item_id) {
+        // 字节读取 + 编码检测：部分中文 EPUB 的 xhtml 是 GBK 编码，
+        // get_resource_str 按 UTF-8 lossy 解码会乱码（修复 2026-08-09）
+        if let Some((bytes, _mime)) = doc.get_resource(item_id) {
+            let content = decode_html_bytes(&bytes);
             let text = strip_html(&content);
             let trimmed = text.trim();
 
@@ -86,6 +89,20 @@ pub fn parse(file_path: &Path, _options: &ParseOptions) -> Result<ParsedDocument
         chapters,
         full_text,
     })
+}
+
+/// 智能解码 EPUB 章节字节：优先 UTF-8（含 BOM），失败回退 GBK（中文 EPUB 常见）。
+fn decode_html_bytes(bytes: &[u8]) -> String {
+    let body = if let Some(rest) = bytes.strip_prefix(&[0xEF, 0xBB, 0xBF]) {
+        rest
+    } else {
+        bytes
+    };
+    if let Ok(s) = std::str::from_utf8(body) {
+        return s.to_string();
+    }
+    let (cow, _, _) = encoding_rs::GBK.decode(body);
+    cow.into_owned()
 }
 
 /// Strip HTML tags, preserving text content.
@@ -226,4 +243,53 @@ mod tests {
 
         std::fs::remove_dir_all(&dir).ok();
     }
+
+    #[test]
+    fn parse_gbk_encoded_chapters() {
+        // 部分中文 EPUB 的 xhtml 为 GBK 编码（乱码修复 2026-08-09）
+        use std::io::Write;
+        let dir = std::env::temp_dir().join(format!("yiyue-epub-gbk-{}", uuid::Uuid::new_v4()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("gbk.epub");
+        let file = std::fs::File::create(&path).unwrap();
+        let mut zip = zip::ZipWriter::new(file);
+        let def = zip::write::SimpleFileOptions::default();
+        let stored = def.compression_method(zip::CompressionMethod::Stored);
+        zip.start_file("mimetype", stored).unwrap();
+        zip.write_all(b"application/epub+zip").unwrap();
+        zip.start_file("META-INF/container.xml", def).unwrap();
+        zip.write_all(
+            br#"<?xml version="1.0"?>
+<container version="1.0" xmlns="urn:oasis:names:tc:opendocument:xmlns:container">
+  <rootfiles><rootfile full-path="OEBPS/content.opf" media-type="application/oebps-package+xml"/></rootfiles>
+</container>"#,
+        )
+        .unwrap();
+        zip.start_file("OEBPS/content.opf", def).unwrap();
+        zip.write_all(
+            r#"<?xml version="1.0"?>
+<package xmlns="http://www.idpf.org/2007/opf" version="2.0" unique-identifier="BookId">
+  <metadata xmlns:dc="http://purl.org/dc/elements/1.1/">
+    <dc:title>乱码测试</dc:title>
+    <dc:language>zh</dc:language>
+  </metadata>
+  <manifest>
+    <item id="ch1" href="ch1.xhtml" media-type="application/xhtml+xml"/>
+  </manifest>
+  <spine><itemref idref="ch1"/></spine>
+</package>"#
+                .as_bytes(),
+        )
+        .unwrap();
+        zip.start_file("OEBPS/ch1.xhtml", def).unwrap();
+        let (gbk, _, _) = encoding_rs::GBK.encode("<html><body><h1>第一章</h1><p>中文内容测试</p></body></html>");
+        zip.write_all(&gbk).unwrap();
+        zip.finish().unwrap();
+
+        let doc = super::parse(&path, &ParseOptions { encoding: None, chapter_pattern: None })
+            .expect("GBK EPUB 应能解析");
+        assert!(doc.chapters[0].content.contains("中文内容测试"), "GBK 内容不应乱码: {:?}", &doc.chapters[0].content);
+        std::fs::remove_dir_all(&dir).ok();
+    }
+
 }

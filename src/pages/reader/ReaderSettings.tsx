@@ -18,6 +18,8 @@ interface ReaderSettingsProps {
   setTextAlign: (v: "left" | "justify") => void;
   pageAnimation: string;
   setPageAnimation: (v: string) => void;
+  readingMode: "scroll" | "columns";
+  setReadingMode: (v: "scroll" | "columns") => void;
   theme: string;
   setTheme: (v: "light" | "dark" | "sepia") => void;
   activePreset: string | null;
@@ -48,6 +50,7 @@ export function ReaderSettings({
   fontFamilyKey, setFontFamilyKey, contentWidthKey, setContentWidthKey,
   paragraphSpacing, setParagraphSpacing, textAlign, setTextAlign,
   pageAnimation, setPageAnimation, theme, setTheme,
+  readingMode, setReadingMode,
   activePreset, applyPreset, setActivePreset,
   isSpeaking, isPaused, startTts, pauseTts, resumeTts, stopTts,
   ttsRate, setTtsRate, onClose,
@@ -173,6 +176,19 @@ export function ReaderSettings({
               onClick={() => { setFontFamilyKey(f.key); markCustom(); }}>{f.label}</ChoiceBtn>
           ))}
         </div>
+      </SettingRow>
+
+      {/* ---- Reading mode ---- */}
+      <SectionLabel>阅读模式</SectionLabel>
+      <SettingRow label="模式">
+        {[
+          { key: "scroll" as const, label: "滚动" },
+          { key: "columns" as const, label: "分栏" },
+        ].map((m) => (
+          <ChoiceBtn key={m.key} active={readingMode === m.key} onClick={() => setReadingMode(m.key)}>
+            {m.label}
+          </ChoiceBtn>
+        ))}
       </SettingRow>
 
       {/* ---- Theme ---- */}

@@ -14,6 +14,7 @@ interface ReaderContentProps {
   contentWidth: number;
   textAlign: "left" | "justify";
   paragraphSpacing: number;
+  readingMode: "scroll" | "columns";
   animClass: string;
   contentRef: React.RefObject<HTMLDivElement | null>;
   onScroll: () => void;
@@ -24,7 +25,7 @@ interface ReaderContentProps {
 export function ReaderContent({
   content, loading, isMarkdown, sanitizedHtml, currentChapter,
   fontSize, lineHeight, fontFamily, contentWidth, textAlign,
-  paragraphSpacing, animClass, contentRef, onScroll,
+  paragraphSpacing, readingMode, animClass, contentRef, onScroll,
   bookId, chapterId,
 }: ReaderContentProps) {
   // Plain-text formats (txt/epub): split into paragraphs on blank lines so the
@@ -35,8 +36,20 @@ export function ReaderContent({
     [content, isMarkdown]
   );
 
+  const columnsStyle = readingMode === "columns"
+    ? ({
+        overflowX: "auto",
+        overflowY: "hidden",
+      } as React.CSSProperties)
+    : undefined;
+
   return (
-    <div ref={contentRef} className="flex-1 overflow-y-auto relative" onScroll={onScroll}>
+    <div
+      ref={contentRef}
+      className="flex-1 overflow-y-auto relative"
+      style={columnsStyle}
+      onScroll={onScroll}
+    >
       {loading ? (
         <div className="flex items-center justify-center h-full">
           <div className="flex flex-col items-center gap-3">
@@ -45,11 +58,16 @@ export function ReaderContent({
           </div>
         </div>
       ) : (
-        <article className={`mx-auto px-8 py-12 ${animClass}`}
+        <article
+          className={`${readingMode === "columns" ? "px-8 py-12 min-w-max " : "mx-auto px-8 py-12 "}${animClass}`}
           style={{
             fontSize: `${fontSize}px`, lineHeight, fontFamily,
-            maxWidth: `${contentWidth}px`, textAlign,
+            maxWidth: readingMode === "columns" ? "none" : `${contentWidth}px`,
+            textAlign,
             '--reader-paragraph-spacing': `${paragraphSpacing}em`,
+            ...(readingMode === "columns"
+              ? { columnWidth: `${Math.max(320, Math.min(420, contentWidth))}px`, columnGap: "56px", columnRule: "1px solid var(--border-light)" }
+              : {}),
           } as React.CSSProperties}>
           <h2 key={currentChapter.id} className="text-2xl font-semibold mb-8 pb-4 animate-slide-down"
             style={{ borderBottom: "1px solid var(--border-light)", color: "var(--text-primary)" }}>
