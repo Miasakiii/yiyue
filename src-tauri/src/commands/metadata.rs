@@ -215,7 +215,7 @@ pub async fn enrich_auto(app: AppHandle, conn: Arc<parking_lot::Mutex<Connection
         .optional()
         .ok()
         .flatten()
-            == Some("1".to_string())
+            != Some("0".to_string())
     };
     if !enabled {
         return;
@@ -246,7 +246,7 @@ pub fn get_metadata_setting(db: State<'_, DbConn>) -> AppResult<bool> {
         )
         .optional()
         .map_err(AppError::Sqlite)?;
-    Ok(v.as_deref() == Some("1"))
+    Ok(v.as_deref() != Some("0"))
 }
 
 /// IPC：保存自动抓取开关。
