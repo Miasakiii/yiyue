@@ -15,14 +15,14 @@
 
 ---
 
-## 1. P0 — 收尾与清理（半天 ~ 1 天）
+## 1. P0 — 收尾与清理（✅ 已完成 2026-08-09）
 
 | # | 事项 | 来源 | 说明 | 验收 |
 |---|---|---|---|---|
-| 1.1 | 提交工作区未提交改动 | 🔧 | `AGENTS.md` / `package.json` / `useReaderKeyboard.test.tsx` 的修改内容需核对后提交；`scripts/checklist-remind.mjs` 决定纳入或删除 | `git status` 干净 |
-| 1.2 | 处理杂项文件 | 🔧 | `gate-full-output.log` 加入 `.gitignore` 或删除；`node_modules.bak` 陈旧备份删除（确认无引用）；`.qoder/` 决定忽略 | 仓库根目录整洁 |
-| 1.3 | 合并 dependabot 分支 | 🔧 | `vite-7.3.5`、`serde_with-3.21.0` 两个分支待合并，跑 `pnpm gate` 验证后合入 | 无残留 dependabot 分支 |
-| 1.4 | 更新 STATUS.md 快照 | 📋 | 7-18 快照已过时：热力图时区已修复（9e45d30 ✅）、测试文件数已变、README 结构目录已变化 | STATUS 与当前代码一致 |
+| 1.1 | ~~提交工作区未提交改动~~ | 🔧 | 分 4 个提交完成：忽略规则、checklist 构建前置+快捷键回归、AGENTS 数据路径、PLAN/调研文档（66aebbe） | ✅ `git status` 干净 |
+| 1.2 | ~~处理杂项文件~~ | 🔧 | `gate-full-output.log` 已被 `*.log` 忽略；`node_modules.bak` 已删除；`.qoder/` 已加入 `.gitignore` | ✅ 仓库根目录整洁 |
+| 1.3 | ~~合并 dependabot 分支~~ | 🔧 | vite-7.3.5 早已合入（无需处理）；serde_with-3.21.0 已 cherry-pick（dd5aa04），cargo check/test 全过 | ✅ 无残留 dependabot 分支 |
+| 1.4 | ~~更新 STATUS.md 快照~~ | 📋 | 更新至 2026-08-09：测试 42/42（6 文件）+ 32/32（Rust）；热力图时区标已修复；72 处 Result 待迁移；测试文件数修正 | ✅ STATUS 与当前代码一致 |
 
 ---
 
