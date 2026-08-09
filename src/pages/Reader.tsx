@@ -276,7 +276,14 @@ export function Reader() {
             durationMs: duration,
             charsRead: charsReadRef.current,
             chaptersRead: 0,
-          }).catch(console.error);
+          })
+            .then(() => invoke<{ name: string }[]>("check_achievements"))
+            .then((unlocked) => {
+              for (const a of unlocked) {
+                showToast(`🏅 解锁成就：${a.name}`, "success");
+              }
+            })
+            .catch(console.error);
         }
       }
     };

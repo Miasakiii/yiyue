@@ -1,5 +1,9 @@
 import { useEffect, useState } from "react";
-import { AlertCircle, Award, BookOpen, Clock, Zap } from "lucide-react";
+import {
+  AlertCircle, Award, BookCheck, BookOpen, BookOpenText, Bookmark, Clock,
+  Crown, Flame, Highlighter, Hourglass, Image, Landmark, Library, LibraryBig,
+  Lock, Medal, Repeat, StickyNote, Zap,
+} from "lucide-react";
 import { invoke } from "@tauri-apps/api/core";
 import { PageHeader, Button } from "../components/ui";
 
@@ -18,6 +22,19 @@ interface DailyStats {
   chars_read: number;
   sessions: number;
 }
+
+interface Achievement {
+  key: string;
+  name: string;
+  description: string;
+  icon: string;
+  unlocked_at: string | null;
+}
+
+const ACHIEVEMENT_ICONS: Record<string, React.ComponentType<{ size?: number; style?: React.CSSProperties }>> = {
+  BookCheck, Library, Highlighter, StickyNote, Bookmark, Clock, Hourglass,
+  Medal, Flame, Crown, BookOpenText, Repeat, LibraryBig, Landmark, Image,
+};
 
 interface BookStats {
   book_id: string;
@@ -45,6 +62,7 @@ export function Stats() {
   const [stats, setStats] = useState<ReadingStats | null>(null);
   const [dailyStats, setDailyStats] = useState<DailyStats[]>([]);
   const [bookStats, setBookStats] = useState<BookStats[]>([]);
+  const [achievements, setAchievements] = useState<Achievement[]>([]);
   const [error, setError] = useState("");
 
   useEffect(() => {
@@ -54,14 +72,16 @@ export function Stats() {
   const loadData = async () => {
     setError("");
     try {
-      const [s, d, b] = await Promise.all([
+      const [s, d, b, a] = await Promise.all([
         invoke<ReadingStats>("get_reading_stats"),
         invoke<DailyStats[]>("get_daily_stats", { days: 90 }),
         invoke<BookStats[]>("get_book_stats"),
+        invoke<Achievement[]>("get_achievements"),
       ]);
       setStats(s);
       setDailyStats(d);
       setBookStats(b);
+      setAchievements(a);
     } catch (e) {
       console.error("Failed to load stats:", e);
       setError("加载统计数据失败，请重试");
@@ -267,6 +287,41 @@ export function Stats() {
                 </div>
               </div>
             )}
+
+            {/* Achievements */}
+            <div
+              className="rounded-xl p-6"
+              style={{
+                background: "var(--bg-secondary)",
+                border: "1px solid var(--border-light)",
+              }}
+            >
+              <h2 className="text-sm font-semibold mb-1">成就</h2>
+              <p className="text-xs mb-4" style={{ color: "var(--text-tertiary)" }}>
+                累计解锁 {achievements.filter((a) => a.unlocked_at).length}/{achievements.length}
+              </p>
+              <div className="grid grid-cols-3 sm:grid-cols-5 gap-3">
+                {achievements.map((a) => {
+                  const Icon = ACHIEVEMENT_ICONS[a.icon] ?? Lock;
+                  const unlocked = !!a.unlocked_at;
+                  return (
+                    <div
+                      key={a.key}
+                      className="rounded-lg p-3 flex flex-col items-center gap-2 text-center transition-transform hover:scale-[1.03]"
+                      title={unlocked ? `${a.name} · ${a.description}` : `未解锁 · ${a.description}`}
+                      style={{
+                        background: unlocked ? "var(--accent-soft)" : "var(--bg-primary)",
+                        border: `1px solid ${unlocked ? "var(--accent)" : "var(--border-light)"}`,
+                        opacity: unlocked ? 1 : 0.55,
+                      }}
+                    >
+                      <Icon size={20} style={{ color: unlocked ? "var(--accent)" : "var(--text-tertiary)" }} />
+                      <div className="text-xs font-medium">{a.name}</div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
           </div>
         ) : (
           <div className="flex items-center justify-center h-full">

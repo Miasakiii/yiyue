@@ -277,7 +277,7 @@ pub fn get_reading_speed(
     }
 }
 
-fn calculate_streaks(dates: &[String]) -> (i64, i64) {
+pub(crate) fn calculate_streaks(dates: &[String]) -> (i64, i64) {
     if dates.is_empty() {
         return (0, 0);
     }

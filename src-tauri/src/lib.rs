@@ -60,6 +60,8 @@ pub fn run() {
             commands::tags::add_book_group,
             commands::tags::remove_book_group,
             commands::tags::get_book_groups,
+            commands::achievements::get_achievements,
+            commands::achievements::check_achievements,
             commands::annotations::get_annotations,
             commands::annotations::create_annotation,
             commands::annotations::update_annotation,

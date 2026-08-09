@@ -145,6 +145,11 @@ pub fn initialize(conn: &Connection) -> Result<(), rusqlite::Error> {
         CREATE INDEX IF NOT EXISTS idx_sessions_book ON reading_sessions(book_id, start_time);
         CREATE INDEX IF NOT EXISTS idx_sessions_time ON reading_sessions(start_time);
 
+        CREATE TABLE IF NOT EXISTS achievements (
+            key          TEXT PRIMARY KEY,
+            unlocked_at  TEXT NOT NULL
+        );
+
         CREATE TABLE IF NOT EXISTS sync_log (
             id          TEXT PRIMARY KEY,
             table_name  TEXT NOT NULL,
