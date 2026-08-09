@@ -1,11 +1,10 @@
 import { useEffect, useState, useRef, useCallback, useMemo } from "react";
-import { BookOpen, ChevronDown, ChevronLeft, ChevronRight, FilePenLine, Focus, List, Maximize, Pause, Play, Settings, X } from "lucide-react";
+import { BookOpen, ChevronDown, ChevronLeft, ChevronRight, FilePenLine, Focus, List, Pause, Play, Settings, X } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { invoke } from "@tauri-apps/api/core";
 import DOMPurify from "dompurify";
 import { useAppStore } from "../stores/app";
 import { NotePanel } from "../components/NotePanel";
-import { useFullscreen } from "../hooks/useFullscreen";
 import { useReaderKeyboard } from "../hooks/useReaderKeyboard";
 import { showToast } from "../components/Toast";
 import { ToolbarBtn, Divider } from "./reader/helpers";
@@ -291,7 +290,6 @@ export function Reader() {
   }, [settingsOpen]);
 
   /* ---- Fullscreen toggle (F11) ---- */
-  const toggleFullscreen = useFullscreen();
 
   /* ---- Track reading session ---- */
   useEffect(() => {
@@ -477,7 +475,7 @@ export function Reader() {
     currentChapter, chapters, loadChapter, setFontSize,
     setShowSidebar, setShowNotes, setSettingsOpen,
     settingsOpen, showNotes, showSidebar,
-    toggleFullscreen, handleAddBookmark, currentBook,
+    toggleImmersive: () => setImmersive((v) => !v), handleAddBookmark, currentBook,
   });
 
   /* ---- Restore scroll position ---- */
@@ -615,14 +613,9 @@ export function Reader() {
               )}
             </ToolbarBtn>
 
-            {/* Immersive button */}
-            <ToolbarBtn onClick={() => setImmersive(true)} title="沉浸阅读">
+            {/* Immersive button (F11 同样切换沉浸) */}
+            <ToolbarBtn active={immersive} onClick={() => setImmersive((v) => !v)} title="沉浸阅读 (F11)">
               <Focus size={14} strokeWidth={2} />
-            </ToolbarBtn>
-
-            {/* Fullscreen button */}
-            <ToolbarBtn onClick={toggleFullscreen} title="全屏 (F11)">
-              <Maximize size={14} strokeWidth={2} />
             </ToolbarBtn>
 
             {/* Settings button */}

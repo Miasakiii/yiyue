@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef, useCallback } from "react";
-import { ChevronLeft, ChevronRight, Columns2, Image, Maximize, SeparatorVertical, ZoomIn, ZoomOut } from "lucide-react";
+import { ChevronLeft, ChevronRight, Columns2, Image, SeparatorVertical, ZoomIn, ZoomOut } from "lucide-react";
 import { invoke, convertFileSrc } from "@tauri-apps/api/core";
 import { useAppStore } from "../stores/app";
 import type { ComicPage } from "../types";
@@ -325,14 +325,6 @@ export function ComicReader() {
           ))}
 
           <div className="w-px h-5 mx-1" style={{ background: "var(--border)" }} />
-
-          {/* Fullscreen */}
-          <button className="px-2 py-1.5 rounded-lg text-xs hover-bg"
-            style={{ color: "var(--text-secondary)" }}
-            onClick={toggleFullscreen}
-            title="全屏 (F11)">
-            <Maximize size={16} strokeWidth={2} />
-          </button>
 
           {/* Double page toggle */}
           {!isWebtoon && (

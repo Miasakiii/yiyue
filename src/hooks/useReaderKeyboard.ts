@@ -14,7 +14,7 @@ interface UseReaderKeyboardOpts {
   settingsOpen: boolean;
   showNotes: boolean;
   showSidebar: boolean;
-  toggleFullscreen: () => void;
+  toggleImmersive: () => void;
   handleAddBookmark: () => void;
   currentBook: { id: string } | null;
 }
@@ -23,7 +23,7 @@ export function useReaderKeyboard({
   currentChapter, chapters, loadChapter, setFontSize,
   setShowSidebar, setShowNotes, setSettingsOpen,
   settingsOpen, showNotes, showSidebar,
-  toggleFullscreen, handleAddBookmark, currentBook,
+  toggleImmersive, handleAddBookmark, currentBook,
 }: UseReaderKeyboardOpts) {
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -80,11 +80,12 @@ export function useReaderKeyboard({
         else if (showNotes) { e.preventDefault(); setShowNotes(false); }
         else if (showSidebar) { e.preventDefault(); setShowSidebar(false); }
       } else if (e.key === "F11") {
+        // F11 = 沉浸阅读（纯净页），非窗口全屏
         e.preventDefault();
-        toggleFullscreen();
+        toggleImmersive();
       }
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [currentChapter, chapters, loadChapter, setFontSize, setShowSidebar, setShowNotes, setSettingsOpen, settingsOpen, showNotes, showSidebar, currentBook, handleAddBookmark, toggleFullscreen]);
+  }, [currentChapter, chapters, loadChapter, setFontSize, setShowSidebar, setShowNotes, setSettingsOpen, settingsOpen, showNotes, showSidebar, currentBook, handleAddBookmark, toggleImmersive]);
 }

@@ -19,7 +19,7 @@ function setup(currentChapter: Chapter = chapters[0]) {
   const setFontSize = vi.fn();
   const setShowSidebar = vi.fn();
   const setShowNotes = vi.fn();
-  const toggleFullscreen = vi.fn();
+  const toggleImmersive = vi.fn();
   const handleAddBookmark = vi.fn();
   renderHook(() =>
     useReaderKeyboard({
@@ -33,12 +33,12 @@ function setup(currentChapter: Chapter = chapters[0]) {
       settingsOpen: false,
       showNotes: false,
       showSidebar: false,
-      toggleFullscreen,
+      toggleImmersive,
       handleAddBookmark,
       currentBook: null,
     })
   );
-  return { loadChapter, setFontSize, setShowSidebar, setShowNotes, toggleFullscreen, handleAddBookmark };
+  return { loadChapter, setFontSize, setShowSidebar, setShowNotes, toggleImmersive, handleAddBookmark };
 }
 
 describe("useReaderKeyboard input guard", () => {
@@ -119,7 +119,7 @@ describe("useReaderKeyboard input guard", () => {
 });
 
 // 自 TEST_CHECKLIST.md「键盘快捷键」迁移的自动化回归（迁移日期 2026-07-28）：
-// Ctrl+= 增大字号 / Ctrl+- 缩小字号 / Ctrl+B 目录侧边栏 / Ctrl+N 笔记面板 / F11 全屏
+// Ctrl+= 增大字号 / Ctrl+- 缩小字号 / Ctrl+B 目录侧边栏 / Ctrl+N 笔记面板 / F11 沉浸阅读
 describe("useReaderKeyboard shortcuts (migrated from TEST_CHECKLIST.md)", () => {
   /** 取最近一次 setFontSize 收到的 updater，验证其对给定字号的计算结果 */
   function lastFontUpdater(setFontSize: ReturnType<typeof vi.fn>) {
@@ -184,12 +184,12 @@ describe("useReaderKeyboard shortcuts (migrated from TEST_CHECKLIST.md)", () => 
     expect(updater(true)).toBe(false);
   });
 
-  it("F11 toggles fullscreen", () => {
-    const { toggleFullscreen } = setup();
+  it("F11 toggles immersive reading", () => {
+    const { toggleImmersive } = setup();
 
     fireEvent.keyDown(document.body, { key: "F11" });
 
-    expect(toggleFullscreen).toHaveBeenCalledTimes(1);
+    expect(toggleImmersive).toHaveBeenCalledTimes(1);
   });
 
   it("ignores shortcuts typed inside an input (guard also covers migrated keys)", () => {
