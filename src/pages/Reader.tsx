@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef, useCallback, useMemo } from "react";
-import { BookOpen, ChevronDown, ChevronLeft, ChevronRight, FilePenLine, List, Maximize, Pause, Play, Settings } from "lucide-react";
+import { BookOpen, ChevronDown, ChevronLeft, ChevronRight, FilePenLine, Focus, List, Maximize, Pause, Play, Settings, X } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { invoke } from "@tauri-apps/api/core";
 import DOMPurify from "dompurify";
@@ -31,6 +31,17 @@ export function Reader() {
   const [charsPerMinute, setCharsPerMinute] = useState(300);
   // 每日目标：settings 表持久化（可 WebDAV 同步）；localStorage 旧值首启迁移
   const [dailyGoal, setDailyGoal] = useState<number>(() => Number(localStorage.getItem("reader-daily-goal")) || 0);
+  // 沉浸阅读：隐藏工具栏/状态栏/侧边栏，只留正文（纯净阅读页）
+  const [immersive, setImmersive] = useState(false);
+  useEffect(() => {
+    if (!immersive) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setImmersive(false);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [immersive]);
+
   // 阅读模式：scroll（滚动）/ columns（分栏分页，横向翻页）
   const [readingMode, setReadingMode] = useState<"scroll" | "columns">(
     () => (localStorage.getItem("reader-mode") as "scroll" | "columns") || "scroll",
@@ -543,8 +554,22 @@ export function Reader() {
 
   return (
     <div className="flex h-full overflow-hidden" style={{ background: "var(--bg-primary)", color: "var(--text-primary)" }}>
+      {/* Immersive exit button (floating, only in immersive mode) */}
+      {immersive && (
+        <button
+          type="button"
+          onClick={() => setImmersive(false)}
+          title="退出沉浸 (Esc)"
+          className="fixed top-4 left-1/2 -translate-x-1/2 z-[var(--z-dropdown)] px-3 py-1.5 rounded-full text-xs flex items-center gap-1.5 transition-opacity opacity-0 hover:opacity-100"
+          style={{ background: "var(--bg-elevated)", border: "1px solid var(--border)", color: "var(--text-secondary)", boxShadow: "var(--shadow-md)" }}
+        >
+          <X size={12} strokeWidth={2} />
+          退出沉浸 (Esc)
+        </button>
+      )}
+
       {/* Sidebar - Chapter list */}
-      {showSidebar && (
+      {showSidebar && !immersive && (
         <ReaderSidebar
           chapters={chapters}
           currentChapter={currentChapter}
@@ -559,7 +584,7 @@ export function Reader() {
       {/* Main content */}
       <div className="flex-1 flex flex-col min-w-0 relative">
         {/* Toolbar */}
-        <header className="flex items-center justify-between px-5 py-2.5 flex-shrink-0"
+        {!immersive && <header className="flex items-center justify-between px-5 py-2.5 flex-shrink-0"
           style={{ borderBottom: "1px solid var(--border)", background: "var(--bg-elevated)" }}>
           <div className="flex items-center gap-1">
             <ToolbarBtn onClick={goBack} title="返回">
@@ -588,6 +613,11 @@ export function Reader() {
               ) : (
                 <Play size={14} strokeWidth={2} />
               )}
+            </ToolbarBtn>
+
+            {/* Immersive button */}
+            <ToolbarBtn onClick={() => setImmersive(true)} title="沉浸阅读">
+              <Focus size={14} strokeWidth={2} />
             </ToolbarBtn>
 
             {/* Fullscreen button */}
@@ -647,7 +677,7 @@ export function Reader() {
 <ChevronDown size={ 10 } strokeWidth={2} />
             </div>
           </div>
-        </header>
+        </header>}
 
         {/* Chapter change toast badge */}
         {chapterToast && (
@@ -726,7 +756,7 @@ export function Reader() {
         )}
 
         {/* Status bar */}
-        <ReaderStatusBar
+        {!immersive && <ReaderStatusBar
           chapterIndex={chapterIndex}
           chapters={chapters}
           currentChapter={currentChapter}
@@ -741,7 +771,7 @@ export function Reader() {
           setEditingGoal={setEditingGoal}
           goalInput={goalInput}
           setGoalInput={setGoalInput}
-        />
+        />}
       </div>
 
       {/* Note panel */}
