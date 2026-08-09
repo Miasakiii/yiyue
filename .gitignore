@@ -1,5 +1,6 @@
 # Dependencies
 node_modules/
+node_modules.bak/
 
 # Build outputs
 dist/
@@ -11,6 +12,7 @@ TEST_CHECKLIST.md
 STATUS.md
 .ralph/
 .mimocode/
+.qoder/
 
 # IDE
 .vscode/
