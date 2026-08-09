@@ -369,6 +369,15 @@ pub async fn import_book(
         started.elapsed().as_millis(),
         "import completed",
     );
+
+    // 元数据自动抓取（PLAN 3.1）：异步后台执行，不阻塞导入返回
+    let meta_app = app.clone();
+    let meta_conn = db.conn.clone();
+    let meta_book_id = book.id.clone();
+    tauri::async_runtime::spawn(async move {
+        crate::commands::metadata::enrich_auto(meta_app, meta_conn, &meta_book_id).await;
+    });
+
     Ok(ImportResult {
         book,
         warnings: Vec::new(),

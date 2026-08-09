@@ -4,6 +4,7 @@ pub mod books;
 pub mod dict;
 pub mod export;
 pub mod import;
+pub mod metadata;
 pub mod opds;
 pub mod rules;
 pub mod search;

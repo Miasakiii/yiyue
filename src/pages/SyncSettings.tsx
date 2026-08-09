@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { AlertCircle, Download, Eye, Globe, Info, RefreshCw, Upload } from "lucide-react";
+import { AlertCircle, BookOpen, Download, Eye, Globe, Info, RefreshCw, Upload } from "lucide-react";
 import { invoke } from "@tauri-apps/api/core";
 import { PageHeader, Button, Input, Switch } from "../components/ui";
 
@@ -34,6 +34,10 @@ export function SyncSettings() {
   const [testError, setTestError] = useState("");
   const [syncing, setSyncing] = useState(false);
   const [syncMessage, setSyncMessage] = useState("");
+  const [metaEnabled, setMetaEnabled] = useState(false);
+  const [enriching, setEnriching] = useState(false);
+  const [enrichProgress, setEnrichProgress] = useState({ current: 0, total: 0 });
+  const [metaMessage, setMetaMessage] = useState("");
 
   useEffect(() => {
     loadData();
@@ -41,14 +45,49 @@ export function SyncSettings() {
 
   const loadData = async () => {
     try {
-      const [c, s] = await Promise.all([
+      const [c, s, m] = await Promise.all([
         invoke<WebDavConfig>("get_webdav_config"),
         invoke<SyncStatus>("get_sync_status"),
+        invoke<boolean>("get_metadata_setting"),
       ]);
       setConfig(c);
       setStatus(s);
+      setMetaEnabled(m);
     } catch (e) {
       console.error("Failed to load sync config:", e);
+    }
+  };
+
+  const handleMetaToggle = async (checked: boolean) => {
+    setMetaEnabled(checked);
+    try {
+      await invoke("save_metadata_setting", { enabled: checked });
+    } catch {
+      setMetaEnabled(!checked);
+    }
+  };
+
+  const enrichAll = async () => {
+    try {
+      const books = await invoke<{ id: string }[]>("get_books");
+      setEnriching(true);
+      setEnrichProgress({ current: 0, total: books.length });
+      let done = 0;
+      for (const b of books) {
+        try {
+          await invoke("enrich_book_metadata", { bookId: b.id, withCover: true });
+        } catch {
+          // 单本失败（网络/无结果）跳过，不中断批量
+        }
+        done += 1;
+        setEnrichProgress({ current: done, total: books.length });
+      }
+      setMetaMessage(`已处理 ${done} 本书`);
+    } catch (e) {
+      setMetaMessage(`补全失败: ${String(e)}`);
+    } finally {
+      setEnriching(false);
+      setTimeout(() => setMetaMessage(""), 5000);
     }
   };
 
@@ -336,6 +375,43 @@ export function SyncSettings() {
             <p className="mt-3 text-xs" style={{ color: "var(--text-tertiary)" }}>
               同步内容包括：阅读进度、笔记划线、标签分组、自定义规则。书籍文件不会同步。
             </p>
+          </div>
+
+          {/* Metadata enrichment card (PLAN 3.1) */}
+          <div
+            className="rounded-xl p-5"
+            style={{
+              background: "var(--bg-secondary)",
+              border: "1px solid var(--border-light)",
+            }}
+          >
+            <h2 className="text-sm font-semibold mb-4 flex items-center gap-2">
+              <BookOpen size={16} strokeWidth={2} />
+              元数据自动抓取
+            </h2>
+            <div className="space-y-4 text-sm">
+              <div className="flex items-center justify-between gap-4">
+                <div>
+                  <p className="font-medium">导入后自动补全元数据</p>
+                  <p className="text-xs mt-1" style={{ color: "var(--text-tertiary)" }}>
+                    通过 Open Library 自动补全作者、简介并下载封面（免费无 key，封面存本地，断网时静默跳过）
+                  </p>
+                </div>
+                <Switch checked={metaEnabled} onChange={handleMetaToggle} title="导入后自动抓取元数据" />
+              </div>
+              <div className="flex items-center gap-3">
+                <Button variant="secondary" size="sm" onClick={enrichAll} disabled={enriching}>
+                  {enriching
+                    ? `处理中 ${enrichProgress.current}/${enrichProgress.total}…`
+                    : "为书库补全元数据"}
+                </Button>
+                {metaMessage && (
+                  <span className="text-xs" style={{ color: "var(--success)" }}>
+                    {metaMessage}
+                  </span>
+                )}
+              </div>
+            </div>
           </div>
         </div>
       </main>
