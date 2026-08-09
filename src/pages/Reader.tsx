@@ -29,7 +29,22 @@ export function Reader() {
   const [content, setContent] = useState("");
   const [loading, setLoading] = useState(false);
   const [charsPerMinute, setCharsPerMinute] = useState(300);
-  const [dailyGoal, setDailyGoal] = useState(() => Number(localStorage.getItem("reader-daily-goal")) || 0);
+  // 每日目标：settings 表持久化（可 WebDAV 同步）；localStorage 旧值首启迁移
+  const [dailyGoal, setDailyGoal] = useState<number>(() => Number(localStorage.getItem("reader-daily-goal")) || 0);
+  useEffect(() => {
+    invoke<number>("get_reading_goal")
+      .then((goal) => {
+        if (goal > 0) {
+          setDailyGoal(goal);
+          localStorage.setItem("reader-daily-goal", String(goal));
+        } else if (Number(localStorage.getItem("reader-daily-goal")) > 0) {
+          // 旧版 localStorage 值迁移到后端
+          const legacy = Number(localStorage.getItem("reader-daily-goal"));
+          invoke("save_reading_goal", { goal: legacy }).catch(console.error);
+        }
+      })
+      .catch(console.error);
+  }, []);
   const [todayStats, setTodayStats] = useState<{ date: string; chars_read: number; duration_ms: number; sessions: number } | null>(null);
   const [editingGoal, setEditingGoal] = useState(false);
   const [goalInput, setGoalInput] = useState("");
@@ -314,6 +329,7 @@ export function Reader() {
   // Persist daily goal
   useEffect(() => {
     localStorage.setItem("reader-daily-goal", String(dailyGoal));
+    invoke("save_reading_goal", { goal: dailyGoal }).catch(console.error);
   }, [dailyGoal]);
 
   /* ---- Chapter change feedback: toast badge + page animation ----

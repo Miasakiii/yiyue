@@ -12,6 +12,12 @@ pub struct SyncPayload {
     pub tags: Vec<serde_json::Value>,
     pub groups: Vec<serde_json::Value>,
     pub rules: Vec<serde_json::Value>,
+    /// 书签（PLAN 3.4.5）
+    pub bookmarks: Vec<serde_json::Value>,
+    /// 每书阅读方案（PLAN 3.4.5）
+    pub reading_profiles: Vec<serde_json::Value>,
+    /// 可同步的设置项（白名单：daily_goal 阅读目标）
+    pub settings: Vec<serde_json::Value>,
     pub timestamp: String,
 }
 
@@ -338,12 +344,70 @@ fn export_sync_data(db: &State<'_, DbConn>) -> AppResult<SyncPayload> {
         .filter_map(|r| r.ok())
         .collect();
 
+    // Export bookmarks (PLAN 3.4.5)
+    let mut stmt = conn
+        .prepare("SELECT * FROM bookmarks")
+        ?;
+    let bookmarks: Vec<serde_json::Value> = stmt
+        .query_map([], |row| {
+            Ok(serde_json::json!({
+                "id": row.get::<_, String>(0)?,
+                "book_id": row.get::<_, String>(1)?,
+                "chapter_id": row.get::<_, Option<String>>(2)?,
+                "scroll_offset": row.get::<_, f64>(3)?,
+                "title": row.get::<_, Option<String>>(4)?,
+                "created_at": row.get::<_, String>(5)?,
+            }))
+        })
+        ?
+        .filter_map(|r| r.ok())
+        .collect();
+
+    // Export reading profiles (PLAN 3.4.5)
+    let mut stmt = conn
+        .prepare("SELECT * FROM reading_profiles")
+        ?;
+    let reading_profiles: Vec<serde_json::Value> = stmt
+        .query_map([], |row| {
+            Ok(serde_json::json!({
+                "book_id": row.get::<_, String>(0)?,
+                "font_size": row.get::<_, i64>(1)?,
+                "line_height": row.get::<_, f64>(2)?,
+                "font_family": row.get::<_, String>(3)?,
+                "content_width": row.get::<_, String>(4)?,
+                "paragraph_spacing": row.get::<_, f64>(5)?,
+                "text_align": row.get::<_, String>(6)?,
+                "page_animation": row.get::<_, String>(7)?,
+            }))
+        })
+        ?
+        .filter_map(|r| r.ok())
+        .collect();
+
+    // Export syncable settings (whitelist: daily_goal)
+    let mut stmt = conn
+        .prepare("SELECT key, value FROM settings WHERE key IN ('daily_goal')")
+        ?;
+    let settings: Vec<serde_json::Value> = stmt
+        .query_map([], |row| {
+            Ok(serde_json::json!({
+                "key": row.get::<_, String>(0)?,
+                "value": row.get::<_, String>(1)?,
+            }))
+        })
+        ?
+        .filter_map(|r| r.ok())
+        .collect();
+
     Ok(SyncPayload {
         reading_progress: progress,
         annotations,
         tags,
         groups,
         rules,
+        bookmarks,
+        reading_profiles,
+        settings,
         timestamp: chrono::Utc::now().to_rfc3339(),
     })
 }
@@ -430,6 +494,59 @@ fn import_sync_data(db: &State<'_, DbConn>, payload: &SyncPayload) -> AppResult<
                     g["icon"].as_str(),
                     g["sort_order"].as_i64().unwrap_or(0),
                 ],
+            )
+            ?;
+        }
+    }
+
+    // Import bookmarks (upsert, PLAN 3.4.5)
+    for b in &payload.bookmarks {
+        if let (Some(id), Some(book_id)) = (b["id"].as_str(), b["book_id"].as_str()) {
+            conn.execute(
+                "INSERT OR REPLACE INTO bookmarks (id, book_id, chapter_id, scroll_offset, title, created_at)
+                 VALUES (?1, ?2, ?3, ?4, ?5, COALESCE(?6, datetime('now')))",
+                params![
+                    id,
+                    book_id,
+                    b["chapter_id"].as_str(),
+                    b["scroll_offset"].as_f64().unwrap_or(0.0),
+                    b["title"].as_str(),
+                    b["created_at"].as_str(),
+                ],
+            )
+            ?;
+        }
+    }
+
+    // Import reading profiles (upsert, PLAN 3.4.5)
+    for pr in &payload.reading_profiles {
+        if let Some(book_id) = pr["book_id"].as_str() {
+            conn.execute(
+                "INSERT OR REPLACE INTO reading_profiles
+                    (book_id, font_size, line_height, font_family, content_width, paragraph_spacing, text_align, page_animation)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
+                params![
+                    book_id,
+                    pr["font_size"].as_i64().unwrap_or(18),
+                    pr["line_height"].as_f64().unwrap_or(1.8),
+                    pr["font_family"].as_str().unwrap_or("default"),
+                    pr["content_width"].as_str().unwrap_or("medium"),
+                    pr["paragraph_spacing"].as_f64().unwrap_or(0.8),
+                    pr["text_align"].as_str().unwrap_or("left"),
+                    pr["page_animation"].as_str().unwrap_or("none"),
+                ],
+            )
+            ?;
+        }
+    }
+
+    // Import syncable settings (upsert, PLAN 3.4.5)
+    for s in &payload.settings {
+        if let (Some(key), Some(value)) = (s["key"].as_str(), s["value"].as_str()) {
+            conn.execute(
+                "INSERT INTO settings (key, value) VALUES (?1, ?2)
+                 ON CONFLICT(key) DO UPDATE SET value = ?2",
+                params![key, value],
             )
             ?;
         }

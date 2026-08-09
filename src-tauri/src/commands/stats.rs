@@ -1,6 +1,6 @@
-use crate::error::{AppResult};
+use crate::error::{AppError, AppResult};
 use crate::db::DbConn;
-use rusqlite::params;
+use rusqlite::{params, OptionalExtension};
 use serde::Serialize;
 use tauri::State;
 use uuid::Uuid;
@@ -313,4 +313,32 @@ pub(crate) fn calculate_streaks(dates: &[String]) -> (i64, i64) {
     };
 
     (current_streak, longest_streak)
+}
+
+/// IPC：读取每日阅读目标（settings 表，跨设备可同步）。
+#[tauri::command]
+pub fn get_reading_goal(db: State<'_, DbConn>) -> AppResult<i64> {
+    let conn = db.conn.lock();
+    let v: Option<String> = conn
+        .query_row(
+            "SELECT value FROM settings WHERE key = 'daily_goal'",
+            [],
+            |r| r.get(0),
+        )
+        .optional()
+        .map_err(AppError::Sqlite)?;
+    Ok(v.and_then(|s| s.parse::<i64>().ok()).unwrap_or(0))
+}
+
+/// IPC：保存每日阅读目标（0 = 关闭）。
+#[tauri::command]
+pub fn save_reading_goal(db: State<'_, DbConn>, goal: i64) -> AppResult<()> {
+    let conn = db.conn.lock();
+    conn.execute(
+        "INSERT INTO settings (key, value) VALUES ('daily_goal', ?1)
+         ON CONFLICT(key) DO UPDATE SET value = ?1",
+        params![goal.to_string()],
+    )
+    .map_err(AppError::Sqlite)?;
+    Ok(())
 }
