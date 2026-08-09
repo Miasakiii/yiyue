@@ -187,6 +187,27 @@ export function ComicReader() {
     return () => container.removeEventListener("wheel", handleWheel);
   }, [handleWheel]);
 
+  // 图片预加载（FUTURE 5.2.2）：当前页前后各 2 页，双页模式额外 +1；
+  // webtoon 长图模式由滚动自然加载，不预加载。
+  useEffect(() => {
+    if (isWebtoon) return;
+    const PRELOAD_RANGE = 2;
+    const targets = new Set<number>();
+    for (let i = -PRELOAD_RANGE; i <= PRELOAD_RANGE; i++) {
+      const idx = currentPage + i;
+      if (idx >= 0 && idx < pages.length && idx !== currentPage) targets.add(idx);
+    }
+    if (doublePage && currentPage + PRELOAD_RANGE + 1 < pages.length) {
+      targets.add(currentPage + PRELOAD_RANGE + 1);
+    }
+    for (const idx of targets) {
+      const path = imgSrc(pages[idx]?.image_path);
+      if (!path) continue;
+      const img = new window.Image(); // lucide 的 Image 组件重名，用 window.Image
+      img.src = path; // 浏览器缓存，翻页时立即可用
+    }
+  }, [currentPage, pages, doublePage, isWebtoon]);
+
   // Keyboard shortcuts for zoom
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
