@@ -48,13 +48,12 @@
 | 交付 | 7e45e97 + 1c99cf3：`commands/metadata.rs`（Open Library search/works API + covers CDN 封面存 `library/covers/{id}.jpg`）；导入后异步自动触发（默认开启，开关可关，失败静默降级）；SyncSettings「元数据自动抓取」卡片（开关 + 一键补全书库，带进度）；IPC +3（共 70） |
 | 备注 | Google Books 匿名配额耗尽（429）改用 Open Library（免费无 key 已验证） |
 
-### 3.2 成就 / 阅读里程碑系统（低-中成本，约 2-3 天）
+### 3.2 成就 / 阅读里程碑系统（✅ 已完成 2026-08-09）
 
 | 来源 | 📚 BookOrbit（50+ 成就、Reading DNA）· 🗺 6.1.5 阅读习惯分析 |
 |---|---|
-| 现状 | 统计闭环已有（时长/热力图/排行榜/每日目标） |
-| 思路 | ① 后端基于 `reading_sessions` 算成就（首次读完一本书、连续 7 天阅读、累计 100 小时、深夜读者等 10-15 个）；② 前端成就页或统计页内嵌，解锁 toast 提示；③ 数据纯本地计算，无新表或加一张 `achievements` 表 |
-| 验收 | 构造数据后能解锁成就并持久化；UI 不破坏阅读沉浸感 |
+| 交付 | 8f5f709：`commands/achievements.rs` 15 个成就（读完/划线/书签/时长/连续天数/字数/藏书/漫画）；`achievements` 表持久化；阅读 session 后自动检查 + Toast 解锁提示；统计页成就网格（解锁/锁定 + 计数）；4 个单元测试；IPC +2（共 72） |
+| 备注 | 夜间/晨间时段类成就因 start_time 存 UTC 无法准确判断本地时段，改为字数/session 类成就 |
 
 ### 3.3 KOReader / Kobo 双向同步（远期，约 1-2 周）
 
