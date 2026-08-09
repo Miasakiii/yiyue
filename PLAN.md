@@ -66,7 +66,7 @@
 
 | # | 事项 | 来源 | 说明 | 预估 |
 |---|---|---|---|---|
-| 3.4.1 | **数据导入/导出（全量）** | 🗺 5.3.5 | 书籍元数据+笔记+进度+规则 → ZIP；支持从 Koodo/Calibre 导入笔记 | 2 天 |
+| 3.4.1 | ~~数据导入/导出（全量）~~ | 🗺 5.3.5 | ✅ eb4158d：14 表 → data.json → ZIP；导入幂等（主键跳过）+ FTS 重建 + 确认 Dialog；Koodo/Calibre 笔记导入因无公开格式规范暂缓；IPC +2（共 80） | — |
 | 3.4.2 | ~~ComicInfo.xml 元数据~~ | 🗺 5.2.5 | ✅ b90978d：CBZ 内 ComicRack 标准提取（Writer/Series/Volume/Year/Summary），Writer 优先、Summary 入简介、并入 metadata_json；2 单测 | — |
 | 3.4.3 | ~~免费书源接入~~ | 🗺 5.3.6 | ✅ 本轮：古腾堡计划（Gutendex 搜索 + 官方下载 + importBook 导入），/source 页面（更多菜单入口）；书格无 API 放弃；IPC +2（共 78） | — |
 | 3.4.4 | **Calibre 桥接** | 🗺 5.3.3 | 检测本地 Calibre，调 `calibredb` CLI 做格式转换/元数据同步 | 2 天 |
