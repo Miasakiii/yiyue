@@ -54,6 +54,10 @@ interface AppState {
   // Theme
   theme: "light" | "dark" | "sepia";
 
+  // Immersive reading (hides global TitleBar for a pure reading page)
+  immersive: boolean;
+  setImmersive: (v: boolean | ((prev: boolean) => boolean)) => void;
+
   // Actions
   loadBooks: (filter?: BookFilter) => Promise<void>;
   setFilter: (filter: BookFilter) => void;
@@ -128,6 +132,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   bookmarks: [],
 
   theme: (localStorage.getItem("reader-theme") as "light" | "dark" | "sepia") || "light",
+  immersive: false,
 
   loadBooks: async (filter?: BookFilter) => {
     set({ loading: true });
@@ -236,6 +241,9 @@ export const useAppStore = create<AppState>((set, get) => ({
     get().loadBooks();
     return result.book;
   },
+
+  setImmersive: (v: boolean | ((prev: boolean) => boolean)) =>
+    set((s) => ({ immersive: typeof v === "function" ? v(s.immersive) : v })),
 
   setTheme: (theme: "light" | "dark" | "sepia") => {
     document.documentElement.classList.remove("dark", "sepia");

@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef, useCallback, useMemo } from "react";
-import { BookOpen, ChevronDown, ChevronLeft, ChevronRight, FilePenLine, Focus, List, Pause, Play, Settings, X } from "lucide-react";
+import { BookOpen, ChevronDown, ChevronLeft, ChevronRight, FilePenLine, Focus, List, Minus, Pause, Play, Settings, X } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { invoke } from "@tauri-apps/api/core";
 import DOMPurify from "dompurify";
@@ -30,8 +30,9 @@ export function Reader() {
   const [charsPerMinute, setCharsPerMinute] = useState(300);
   // 每日目标：settings 表持久化（可 WebDAV 同步）；localStorage 旧值首启迁移
   const [dailyGoal, setDailyGoal] = useState<number>(() => Number(localStorage.getItem("reader-daily-goal")) || 0);
-  // 沉浸阅读：隐藏工具栏/状态栏/侧边栏，只留正文（纯净阅读页）
-  const [immersive, setImmersive] = useState(false);
+  // 沉浸阅读：隐藏全局标题栏/工具栏/状态栏/侧边栏，只留正文（纯净阅读页）
+  const immersive = useAppStore((s) => s.immersive);
+  const setImmersive = useAppStore((s) => s.setImmersive);
   useEffect(() => {
     if (!immersive) return;
     const onKey = (e: KeyboardEvent) => {
@@ -39,7 +40,7 @@ export function Reader() {
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [immersive]);
+  }, [immersive, setImmersive]);
 
   // 阅读模式：scroll（滚动）/ columns（分栏分页，横向翻页）
   const [readingMode, setReadingMode] = useState<"scroll" | "columns">(
@@ -552,18 +553,47 @@ export function Reader() {
 
   return (
     <div className="flex h-full overflow-hidden" style={{ background: "var(--bg-primary)", color: "var(--text-primary)" }}>
-      {/* Immersive exit button (floating, only in immersive mode) */}
+      {/* Immersive floating controls: exit + window controls (TitleBar hidden) */}
       {immersive && (
-        <button
-          type="button"
-          onClick={() => setImmersive(false)}
-          title="退出沉浸 (Esc)"
-          className="fixed top-4 left-1/2 -translate-x-1/2 z-[var(--z-dropdown)] px-3 py-1.5 rounded-full text-xs flex items-center gap-1.5 transition-opacity opacity-0 hover:opacity-100"
-          style={{ background: "var(--bg-elevated)", border: "1px solid var(--border)", color: "var(--text-secondary)", boxShadow: "var(--shadow-md)" }}
+        <div
+          className="fixed top-3 left-1/2 -translate-x-1/2 z-[var(--z-dropdown)] flex items-center gap-1 rounded-full px-2 py-1 transition-opacity opacity-0 hover:opacity-100"
+          style={{ background: "var(--bg-elevated)", border: "1px solid var(--border)", boxShadow: "var(--shadow-md)" }}
         >
-          <X size={12} strokeWidth={2} />
-          退出沉浸 (Esc)
-        </button>
+          <button
+            type="button"
+            onClick={() => setImmersive(false)}
+            title="退出沉浸 (Esc)"
+            className="px-2 py-0.5 rounded-full text-xs flex items-center gap-1 hover-bg"
+            style={{ color: "var(--text-secondary)" }}
+          >
+            <X size={12} strokeWidth={2} />
+            退出
+          </button>
+          <button
+            type="button"
+            onClick={async () => {
+              const { getCurrentWindow } = await import("@tauri-apps/api/window");
+              await getCurrentWindow().minimize();
+            }}
+            title="最小化"
+            className="px-2 py-0.5 rounded-full hover-bg"
+            style={{ color: "var(--text-secondary)" }}
+          >
+            <Minus size={12} strokeWidth={2} />
+          </button>
+          <button
+            type="button"
+            onClick={async () => {
+              const { getCurrentWindow } = await import("@tauri-apps/api/window");
+              await getCurrentWindow().close();
+            }}
+            title="关闭"
+            className="px-2 py-0.5 rounded-full hover-bg hover:bg-[var(--error)] hover:text-white"
+            style={{ color: "var(--text-secondary)" }}
+          >
+            <X size={12} strokeWidth={2} />
+          </button>
+        </div>
       )}
 
       {/* Sidebar - Chapter list */}

@@ -12,6 +12,12 @@ import { LanTransfer } from "./pages/LanTransfer";
 import { SourceBooks } from "./pages/SourceBooks";
 import { SearchPanel } from "./components/SearchPanel";
 import { TitleBar } from "./components/TitleBar";
+
+/** 沉浸阅读时隐藏全局标题栏（纯净阅读页）；窗口控制由阅读器悬浮按钮接管。 */
+function ImmersiveGate() {
+  const immersive = useAppStore((s) => s.immersive);
+  return immersive ? null : <TitleBar />;
+}
 import { ToastContainer } from "./components/Toast";
 import "./App.css";
 
@@ -81,7 +87,7 @@ function App() {
 
   return (
     <div className="flex flex-col h-screen overflow-hidden">
-      <TitleBar />
+      <ImmersiveGate />
       <div className="flex-1 min-h-0 relative">
         <Routes>
           <Route path="/" element={<Library />} />
