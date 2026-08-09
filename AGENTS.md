@@ -21,6 +21,27 @@ Tauri 2.0 桌面阅读器。前端 React 19 + TypeScript + Vite 7，后端 Rust 
 
 CI 门禁：`.github/workflows/ci.yml` 在 push/PR 时按变更区域运行前端（tsc + vitest）与后端（cargo check + test）检查，任一失败即 `gate` 汇总作业阻断。
 
+### 数据与状态路径（Windows）
+
+应用数据目录：`%APPDATA%\com.asakii.yiyue\`（Tauri `app_data_dir()`，由 `tauri.conf.json` 的 `identifier` 决定，解析逻辑见 `src-tauri/src/db/mod.rs` 的 `get_db_path`）。
+
+| 路径 | 内容 | 可否删除 |
+|---|---|---|
+| `data.db` | SQLite 主数据库（16 表 + 3 FTS5 虚拟表：书库/章节/进度/笔记/规则/设置） | 可删=重置全部数据，**必须与 `-wal`/`-shm` 一起删** |
+| `data.db-wal` / `data.db-shm` | WAL 日志/共享内存（`PRAGMA journal_mode=WAL`），未合并的写入在 WAL 里 | ⚠️ **不可单独删除**（会丢最近写入），只能与 `data.db` 三件套同进同出 |
+| `library\<xx>\<hash>.<ext>` | 导入书籍的源文件副本（按哈希前两位分桶，`commands/import.rs`） | ⚠️ 删除后已导入书籍无法打开正文，需重新导入 |
+| `library\comic_cache\` | 漫画解压页面缓存 | ⚠️ 删除后漫画页面无法显示，需重新导入 |
+| `%TEMP%\yiyue-uploads\` | 局域网传输的临时上传文件 | 可删 |
+| OS 凭据管理器条目 `yiyue-webdav` | WebDAV 密码（`keyring` crate） | 不在数据目录内，删文件不会清除；需在应用同步页清空密码或在 Windows 凭据管理器中删除 |
+
+**安全重置步骤**（重置数据库、修复损坏的库）：
+
+1. 完全关闭应用，确认 `yiyue.exe` 进程已退出（否则文件被占用且 WAL 未合并）
+2. 将 `data.db`、`data.db-wal`、`data.db-shm` **三个文件一起**移动到备份目录（缺一不可，单独保留 WAL 会导致数据不一致）；若需保留已导入书籍的源文件，另行备份 `library\`
+3. 重新启动应用（`pnpm tauri dev` 或安装版），启动时 `db::init_db` 自动重建空库并重新播种预置规则
+
+**Schema 变更后的重建方式**：`db/schema.rs` 全部使用 `CREATE TABLE IF NOT EXISTS`，每次启动都会执行 `schema::initialize` + `migrate_add_pinyin_columns`（`lib.rs` setup）。因此**新增**表/索引/虚拟表启动即自动补建；但**修改既有表结构**（改列/改约束）不会自动生效——开发环境按上面重置步骤删库重建，需保留用户数据时应在 `schema.rs` 中仿照 `migrate_add_pinyin_columns` 新增幂等的 `migrate_*` 函数并在 `init_db` 中调用。从零建库的正确性可用 `cd src-tauri && cargo test schema` 验证（schema 测试在全新连接上完整初始化）。
+
 ## 关键约束
 
 - **IPC 命令必须成对注册**：新增 Rust 命令后，需同时在 `src-tauri/src/lib.rs` 的 `generate_handler![...]` 中注册，并在 `src-tauri/src/commands/mod.rs` 声明 `pub mod`。漏注册会导致前端 `invoke` 静默失败。
@@ -132,5 +153,5 @@ CI 门禁：`.github/workflows/ci.yml` 在 push/PR 时按变更区域运行前�
 
 - `STATUS.md`：详细的项目状态报告，包含已知问题、IPC 命令清单、数据库 Schema
 - `FUTURE.md`：完整路线图，Phase 4.1-6.2 规划
-- `TEST_CHECKLIST.md`：端到端测试清单（未执行，需手动验证）
+- `TEST_CHECKLIST.md`：端到端测试清单（每项带「最近执行」记录；`pnpm build` 前置运行 `scripts/checklist-remind.mjs` 输出核对提醒；连续多次通过且可自动化的项迁移为回归测试并标 🤖，键盘快捷键组已迁入 `useReaderKeyboard.test.tsx`）
 - `README.md`：功能特性、快捷键、路由表
