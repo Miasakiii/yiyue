@@ -16,24 +16,29 @@ const chapters = [
 
 function setup(currentChapter: Chapter = chapters[0]) {
   const loadChapter = vi.fn();
+  const setFontSize = vi.fn();
+  const setShowSidebar = vi.fn();
+  const setShowNotes = vi.fn();
+  const toggleFullscreen = vi.fn();
+  const handleAddBookmark = vi.fn();
   renderHook(() =>
     useReaderKeyboard({
       currentChapter,
       chapters,
       loadChapter,
-      setFontSize: vi.fn(),
-      setShowSidebar: vi.fn(),
-      setShowNotes: vi.fn(),
+      setFontSize,
+      setShowSidebar,
+      setShowNotes,
       setSettingsOpen: vi.fn(),
       settingsOpen: false,
       showNotes: false,
       showSidebar: false,
-      toggleFullscreen: vi.fn(),
-      handleAddBookmark: vi.fn(),
+      toggleFullscreen,
+      handleAddBookmark,
       currentBook: null,
     })
   );
-  return { loadChapter };
+  return { loadChapter, setFontSize, setShowSidebar, setShowNotes, toggleFullscreen, handleAddBookmark };
 }
 
 describe("useReaderKeyboard input guard", () => {
@@ -110,5 +115,91 @@ describe("useReaderKeyboard input guard", () => {
     // fireEvent returns false only when preventDefault was called
     const notPrevented = fireEvent.keyDown(document.body, { key: "ArrowRight" });
     expect(notPrevented).toBe(true);
+  });
+});
+
+// 自 TEST_CHECKLIST.md「键盘快捷键」迁移的自动化回归（迁移日期 2026-07-28）：
+// Ctrl+= 增大字号 / Ctrl+- 缩小字号 / Ctrl+B 目录侧边栏 / Ctrl+N 笔记面板 / F11 全屏
+describe("useReaderKeyboard shortcuts (migrated from TEST_CHECKLIST.md)", () => {
+  /** 取最近一次 setFontSize 收到的 updater，验证其对给定字号的计算结果 */
+  function lastFontUpdater(setFontSize: ReturnType<typeof vi.fn>) {
+    const calls = setFontSize.mock.calls;
+    return calls[calls.length - 1][0] as (n: number) => number;
+  }
+
+  it("Ctrl+= increases font size by 2, capped at 36", () => {
+    const { setFontSize } = setup();
+
+    fireEvent.keyDown(document.body, { key: "=", ctrlKey: true });
+
+    expect(setFontSize).toHaveBeenCalledTimes(1);
+    const updater = lastFontUpdater(setFontSize);
+    expect(updater(16)).toBe(18);
+    expect(updater(36)).toBe(36);
+    expect(updater(35)).toBe(36);
+  });
+
+  it("Ctrl+- decreases font size by 2, floored at 12", () => {
+    const { setFontSize } = setup();
+
+    fireEvent.keyDown(document.body, { key: "-", ctrlKey: true });
+
+    expect(setFontSize).toHaveBeenCalledTimes(1);
+    const updater = lastFontUpdater(setFontSize);
+    expect(updater(16)).toBe(14);
+    expect(updater(12)).toBe(12);
+    expect(updater(13)).toBe(12);
+  });
+
+  it("Ctrl+B toggles the sidebar (without adding a bookmark)", () => {
+    const { setShowSidebar, handleAddBookmark } = setup();
+
+    fireEvent.keyDown(document.body, { key: "b", ctrlKey: true });
+
+    expect(setShowSidebar).toHaveBeenCalledTimes(1);
+    expect(handleAddBookmark).not.toHaveBeenCalled();
+    // 传入的是取反 updater：true -> false，false -> true
+    const updater = setShowSidebar.mock.calls[0][0] as (prev: boolean) => boolean;
+    expect(updater(true)).toBe(false);
+    expect(updater(false)).toBe(true);
+  });
+
+  it("Ctrl+Shift+B adds a bookmark instead of toggling the sidebar", () => {
+    const { setShowSidebar, handleAddBookmark } = setup();
+
+    fireEvent.keyDown(document.body, { key: "B", ctrlKey: true, shiftKey: true });
+
+    expect(handleAddBookmark).toHaveBeenCalledTimes(1);
+    expect(setShowSidebar).not.toHaveBeenCalled();
+  });
+
+  it("Ctrl+N toggles the notes panel", () => {
+    const { setShowNotes } = setup();
+
+    fireEvent.keyDown(document.body, { key: "n", ctrlKey: true });
+
+    expect(setShowNotes).toHaveBeenCalledTimes(1);
+    const updater = setShowNotes.mock.calls[0][0] as (prev: boolean) => boolean;
+    expect(updater(false)).toBe(true);
+    expect(updater(true)).toBe(false);
+  });
+
+  it("F11 toggles fullscreen", () => {
+    const { toggleFullscreen } = setup();
+
+    fireEvent.keyDown(document.body, { key: "F11" });
+
+    expect(toggleFullscreen).toHaveBeenCalledTimes(1);
+  });
+
+  it("ignores shortcuts typed inside an input (guard also covers migrated keys)", () => {
+    const { setFontSize, setShowSidebar } = setup();
+    const { getByTestId } = render(<input data-testid="field" />);
+
+    fireEvent.keyDown(getByTestId("field"), { key: "=", ctrlKey: true });
+    fireEvent.keyDown(getByTestId("field"), { key: "b", ctrlKey: true });
+
+    expect(setFontSize).not.toHaveBeenCalled();
+    expect(setShowSidebar).not.toHaveBeenCalled();
   });
 });
