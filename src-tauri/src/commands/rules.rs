@@ -2,7 +2,7 @@ use crate::error::{AppError, AppResult};
 use crate::commands::search as search_cmd;
 use crate::db::DbConn;
 use crate::rules::{self, Rule, RuleGroup};
-use rusqlite::params;
+use rusqlite::{params, OptionalExtension};
 use tauri::State;
 use uuid::Uuid;
 
@@ -389,4 +389,157 @@ pub fn seed_preset_rules(conn: &rusqlite::Connection) -> AppResult<()> {
     }
 
     Ok(())
+}
+
+/* ---------- 规则包导出/导入（PLAN 3.4.6） ---------- */
+
+#[derive(serde::Serialize)]
+struct RulesExport {
+    version: i32,
+    exported_at: String,
+    groups: Vec<RuleGroup>,
+    rules: Vec<Rule>,
+}
+
+/// IPC：导出全部规则包（JSON 字符串，含分组）。
+#[tauri::command]
+pub fn export_rules_payload(db: State<'_, DbConn>) -> AppResult<String> {
+    let conn = db.conn.lock();
+    let mut groups = Vec::new();
+    {
+        let mut stmt = conn
+            .prepare("SELECT id, name, description, is_preset, enabled FROM rule_groups ORDER BY name")
+            ?;
+        let rows = stmt.query_map([], |row| {
+            Ok(RuleGroup {
+                id: row.get(0)?,
+                name: row.get(1)?,
+                description: row.get(2)?,
+                is_preset: row.get(3)?,
+                enabled: row.get(4)?,
+            })
+        })?;
+        for row in rows {
+            groups.push(row?);
+        }
+    }
+    let mut rules = Vec::new();
+    {
+        let mut stmt = conn
+            .prepare("SELECT id, name, pattern, replacement, scope, is_regex, enabled, priority, group_id, description FROM rules ORDER BY priority DESC, name")
+            ?;
+        let rows = stmt.query_map([], |row| {
+            Ok(Rule {
+                id: row.get(0)?,
+                name: row.get(1)?,
+                pattern: row.get(2)?,
+                replacement: row.get(3)?,
+                scope: row.get(4)?,
+                is_regex: row.get(5)?,
+                enabled: row.get(6)?,
+                priority: row.get(7)?,
+                group_id: row.get(8)?,
+                description: row.get(9)?,
+            })
+        })?;
+        for row in rows {
+            rules.push(row?);
+        }
+    }
+    let payload = RulesExport {
+        version: 1,
+        exported_at: chrono::Utc::now().to_rfc3339(),
+        groups,
+        rules,
+    };
+    serde_json::to_string(&payload).map_err(AppError::Json)
+}
+
+/// IPC：导入规则包（JSON 字符串）。返回导入的规则数。
+/// 预设组（id 以 preset- 开头）跳过；同名字自定义组复用；规则一律新建 id。
+#[tauri::command]
+pub fn import_rules_payload(db: State<'_, DbConn>, json: String) -> AppResult<i64> {
+    let payload: RulesImport = serde_json::from_str(&json).map_err(AppError::Json)?;
+    if payload.version < 1 || payload.version > 1 {
+        return Err(AppError::InvalidInput(format!("不支持的规则包版本: {}", payload.version)));
+    }
+    let conn = db.conn.lock();
+
+    let mut imported = 0i64;
+    for g in &payload.groups {
+        if g.id.starts_with("preset-") {
+            continue; // 预设组不导入，避免与播种冲突
+        }
+        let existing: Option<String> = conn
+            .query_row(
+                "SELECT id FROM rule_groups WHERE name = ?1",
+                params![g.name],
+                |r| r.get(0),
+            )
+            .optional()
+            .map_err(AppError::Sqlite)?;
+        let group_id = match existing {
+            Some(id) => id,
+            None => {
+                let id = Uuid::new_v4().to_string();
+                conn.execute(
+                    "INSERT INTO rule_groups (id, name, description, is_preset, enabled)
+                     VALUES (?1, ?2, ?3, 0, ?4)",
+                    params![id, g.name, g.description, g.enabled],
+                )
+                .map_err(AppError::Sqlite)?;
+                id
+            }
+        };
+        // 该组下的规则
+        for r in payload.rules.iter().filter(|r| r.group_id.as_deref() == Some(g.id.as_str())) {
+            conn.execute(
+                "INSERT INTO rules (id, name, pattern, replacement, scope, is_regex, enabled, priority, group_id, description)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
+                params![
+                    Uuid::new_v4().to_string(),
+                    r.name, r.pattern, r.replacement, r.scope, r.is_regex,
+                    r.enabled, r.priority, group_id, r.description,
+                ],
+            )
+            .map_err(AppError::Sqlite)?;
+            imported += 1;
+        }
+    }
+    // 无分组规则
+    for r in payload.rules.iter().filter(|r| r.group_id.is_none()) {
+        conn.execute(
+            "INSERT INTO rules (id, name, pattern, replacement, scope, is_regex, enabled, priority, group_id, description)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, NULL, ?10)",
+            params![
+                Uuid::new_v4().to_string(),
+                r.name, r.pattern, r.replacement, r.scope, r.is_regex,
+                r.enabled, r.priority, r.description,
+            ],
+        )
+        .map_err(AppError::Sqlite)?;
+        imported += 1;
+    }
+    Ok(imported)
+}
+
+#[derive(serde::Deserialize)]
+struct RulesImport {
+    version: i32,
+    groups: Vec<RuleGroup>,
+    rules: Vec<Rule>,
+}
+
+/// IPC：导出规则包到指定文件（前端 save 对话框拿路径）。
+#[tauri::command]
+pub fn export_rules_to_file(path: String, json: String) -> AppResult<()> {
+    std::fs::write(&path, json).map_err(AppError::Io)?;
+    Ok(())
+}
+
+/// IPC：从指定文件导入规则包（前端 open 对话框拿路径）。
+#[tauri::command]
+pub fn import_rules_from_file(db: State<'_, DbConn>, path: String) -> AppResult<i64> {
+    let json = std::fs::read_to_string(&path).map_err(AppError::Io)?;
+    import_rules_payload(db, json)
 }

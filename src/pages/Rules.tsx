@@ -1,8 +1,10 @@
 import { useEffect, useState } from "react";
-import { Book, FileText, Plus, X } from "lucide-react";
+import { Book, Download, FileText, Plus, Upload, X } from "lucide-react";
+import { invoke } from "@tauri-apps/api/core";
 import { useAppStore } from "../stores/app";
 import type { Rule, CreateRule } from "../types";
 import { PageHeader, Button, Input, Switch, Dialog } from "../components/ui";
+import { showToast } from "../components/Toast";
 
 const SCOPES = [
   { value: "global", label: "全文" },
@@ -44,6 +46,38 @@ export function Rules() {
     loadRuleGroups();
     loadBooks();
   }, [loadRules, loadRuleGroups, loadBooks]);
+
+  const handleExportRules = async () => {
+    try {
+      const payload = await invoke<string>("export_rules_payload");
+      const { save } = await import("@tauri-apps/plugin-dialog");
+      const path = await save({
+        defaultPath: `yiyue-rules-${new Date().toISOString().slice(0, 10)}.json`,
+        filters: [{ name: "JSON", extensions: ["json"] }],
+      });
+      if (!path) return;
+      await invoke("export_rules_to_file", { path, json: payload });
+      showToast("规则包已导出", "success");
+    } catch (e) {
+      showToast(`导出失败: ${String(e)}`, "error");
+    }
+  };
+
+  const handleImportRules = async () => {
+    try {
+      const { open } = await import("@tauri-apps/plugin-dialog");
+      const path = await open({
+        multiple: false,
+        filters: [{ name: "JSON", extensions: ["json"] }],
+      });
+      if (!path) return;
+      const n = await invoke<number>("import_rules_from_file", { path });
+      await Promise.all([loadRules(), loadRuleGroups()]);
+      showToast(`已导入 ${n} 条规则`, "success");
+    } catch (e) {
+      showToast(`导入失败: ${String(e)}`, "error");
+    }
+  };
 
   const openCreateForm = () => {
     setEditingRule(null);
@@ -194,10 +228,20 @@ export function Rules() {
         <PageHeader
           title="规则引擎"
           actions={
-            <Button variant="secondary" size="sm" onClick={openCreateForm}>
-<Plus size={ 13 } strokeWidth={2.5} />
-              新建规则
-            </Button>
+            <>
+              <Button variant="secondary" size="sm" onClick={handleExportRules}>
+                <Download size={13} strokeWidth={2.5} />
+                导出规则
+              </Button>
+              <Button variant="secondary" size="sm" onClick={handleImportRules}>
+                <Upload size={13} strokeWidth={2.5} />
+                导入规则
+              </Button>
+              <Button variant="secondary" size="sm" onClick={openCreateForm}>
+                <Plus size={13} strokeWidth={2.5} />
+                新建规则
+              </Button>
+            </>
           }
         />
 

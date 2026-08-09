@@ -54,6 +54,59 @@ pub struct ParsedComic {
     pub metadata: ComicMetadata,
     pub chapters: Vec<ComicChapter>,
     pub cover_path: Option<String>,
+    /// ComicRack 标准 ComicInfo.xml 元数据（仅 CBZ 可能包含）
+    pub comic_info: Option<ComicInfo>,
+}
+
+/// ComicRack ComicInfo.xml 提取的子集（PLAN 3.4.2）。
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct ComicInfo {
+    pub title: Option<String>,
+    pub writer: Option<String>,
+    pub series: Option<String>,
+    pub volume: Option<String>,
+    pub year: Option<String>,
+    pub summary: Option<String>,
+}
+
+/// 极简 XML 标签提取（ComicInfo.xml 结构简单，无需完整 XML 解析器）。
+fn extract_tag(xml: &str, tag: &str) -> Option<String> {
+    let open = format!("<{}>", tag);
+    let close = format!("</{}>", tag);
+    let s = xml.find(&open)? + open.len();
+    let e = xml[s..].find(&close)?;
+    let v = xml[s..s + e].trim();
+    if v.is_empty() { None } else { Some(v.to_string()) }
+}
+
+/// 解析 ComicInfo.xml 内容。
+fn parse_comic_info(xml: &str) -> Option<ComicInfo> {
+    if !xml.contains("<ComicInfo") {
+        return None;
+    }
+    Some(ComicInfo {
+        title: extract_tag(xml, "Title"),
+        writer: extract_tag(xml, "Writer"),
+        series: extract_tag(xml, "Series"),
+        volume: extract_tag(xml, "Volume"),
+        year: extract_tag(xml, "Year"),
+        summary: extract_tag(xml, "Summary"),
+    })
+}
+
+/// 从 CBZ 压缩包读取 ComicInfo.xml（根目录或任意子目录）。
+fn read_comic_info(archive: &mut zip::ZipArchive<fs::File>) -> Option<ComicInfo> {
+    use std::io::Read;
+    for i in 0..archive.len() {
+        let name = archive.by_index(i).ok()?.name().to_lowercase();
+        if name == "comicinfo.xml" || name.ends_with("/comicinfo.xml") {
+            let mut entry = archive.by_index(i).ok()?;
+            let mut content = String::new();
+            entry.read_to_string(&mut content).ok()?;
+            return parse_comic_info(&content);
+        }
+    }
+    None
 }
 
 /// Parse a CBZ file. Extracts images to cache directory.
@@ -68,6 +121,8 @@ pub fn parse_cbz(cbz_path: &Path, cache_dir: &Path) -> AppResult<ParsedComic> {
 
     let book_cache_dir = cache_dir.join(&book_hash[..2]).join(&book_hash);
     fs::create_dir_all(&book_cache_dir).map_err(|e| AppError::Parse(sanitize_error(e.to_string())))?;
+
+    let comic_info = read_comic_info(&mut archive);
 
     // Collect image entries
     let mut image_entries: Vec<(String, usize)> = Vec::new();
@@ -161,6 +216,7 @@ pub fn parse_cbz(cbz_path: &Path, cache_dir: &Path) -> AppResult<ParsedComic> {
         },
         chapters: vec![chapter],
         cover_path,
+        comic_info,
     })
 }
 
@@ -257,6 +313,7 @@ pub fn parse_folder(folder_path: &Path, cache_dir: &Path) -> AppResult<ParsedCom
         },
         chapters: vec![chapter],
         cover_path,
+        comic_info: None,
     })
 }
 
@@ -385,6 +442,7 @@ pub fn parse_cbr(cbr_path: &Path, cache_dir: &Path) -> AppResult<ParsedComic> {
         },
         chapters: vec![chapter],
         cover_path,
+        comic_info: None,
     })
 }
 
@@ -443,4 +501,62 @@ mod tests {
         });
         assert_eq!(names, vec!["page1.jpg", "page2.jpg", "page10.jpg", "page20.jpg"]);
     }
+
+    #[test]
+    fn parse_cbz_reads_comic_info() {
+        // PLAN 3.4.2：ComicRack 标准 ComicInfo.xml 应被提取
+        use std::io::Write;
+        let dir = std::env::temp_dir().join(format!("yiyue-cbz-test-{}", uuid::Uuid::new_v4()));
+        let cache = dir.join("cache");
+        std::fs::create_dir_all(&cache).unwrap();
+        let path = dir.join("book.cbz");
+        let file = std::fs::File::create(&path).unwrap();
+        let mut zip = zip::ZipWriter::new(file);
+        let def = zip::write::SimpleFileOptions::default();
+        zip.start_file("ComicInfo.xml", def).unwrap();
+        zip.write_all(
+            r#"<?xml version="1.0"?>
+<ComicInfo>
+  <Title>测试漫画</Title>
+  <Writer>作者乙</Writer>
+  <Series>系列X</Series>
+  <Volume>3</Volume>
+  <Year>2020</Year>
+  <Summary>这是一个测试摘要</Summary>
+</ComicInfo>"#
+            .as_bytes(),
+        )
+        .unwrap();
+        // 标准 1x1 PNG
+        zip.start_file("page1.png", def).unwrap();
+        zip.write_all(&[
+            0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x00, 0x00, 0x00, 0x0D,
+            0x49, 0x48, 0x44, 0x52, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01,
+            0x08, 0x06, 0x00, 0x00, 0x00, 0x1F, 0x15, 0xC4, 0x89, 0x00, 0x00, 0x00,
+            0x0D, 0x49, 0x44, 0x41, 0x54, 0x78, 0x9C, 0x62, 0x00, 0x01, 0x00, 0x00,
+            0x05, 0x00, 0x01, 0x0D, 0x0A, 0x2D, 0xB4, 0x00, 0x00, 0x00, 0x00, 0x49,
+            0x45, 0x4E, 0x44, 0xAE, 0x42, 0x60, 0x82,
+        ])
+        .unwrap();
+        zip.finish().unwrap();
+
+        let comic = super::parse_cbz(&path, &cache).expect("CBZ 应能解析");
+        let ci = comic.comic_info.expect("应读到 ComicInfo");
+        assert_eq!(ci.title.as_deref(), Some("测试漫画"));
+        assert_eq!(ci.writer.as_deref(), Some("作者乙"));
+        assert_eq!(ci.series.as_deref(), Some("系列X"));
+        assert_eq!(ci.volume.as_deref(), Some("3"));
+        assert_eq!(ci.year.as_deref(), Some("2020"));
+        assert_eq!(ci.summary.as_deref(), Some("这是一个测试摘要"));
+        // 非漫画格式目录不应有 comic_info
+        assert!(comic.metadata.total_pages > 0, "应有至少一页");
+        std::fs::remove_dir_all(&dir).ok();
+    }
+
+    #[test]
+    fn parse_comic_info_missing_returns_none() {
+        assert!(parse_comic_info("<html>no comic info here</html>").is_none());
+        assert!(parse_comic_info("<ComicInfo><Title>x</Title></ComicInfo>").is_some());
+    }
+
 }

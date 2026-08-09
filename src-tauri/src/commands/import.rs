@@ -299,14 +299,27 @@ pub async fn import_book(
             }
             ParsedImport::Comic { comic } => {
                 // Insert comic book
+                // ComicInfo.xml 元数据（PLAN 3.4.2）：Writer 优先于推断作者，Summary 入简介，
+                // series/volume/year 等并入 metadata_json
+                let comic_info_author = comic
+                    .comic_info
+                    .as_ref()
+                    .and_then(|ci| ci.writer.clone())
+                    .or_else(|| comic.metadata.author.clone());
+                let comic_summary = comic.comic_info.as_ref().and_then(|ci| ci.summary.clone());
+                let mut comic_meta_json = serde_json::to_value(&comic.metadata).unwrap_or_default();
+                if let Some(ci) = &comic.comic_info {
+                    comic_meta_json["comic_info"] = serde_json::to_value(ci).unwrap_or_default();
+                }
                 conn.execute(
                     "INSERT INTO books (id, kind, title, author, file_hash, file_path, file_size, format,
-                                       language, total_chapters, total_chars, cover_path, metadata_json, reading_mode)
-                     VALUES (?1, 'comic', ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, 0, ?10, ?11, ?12)",
+                                       language, total_chapters, total_chars, cover_path, metadata_json, reading_mode,
+                                       description)
+                     VALUES (?1, 'comic', ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, 0, ?10, ?11, ?12, ?13)",
                     params![
                         book_id,
                         comic.metadata.title,
-                        comic.metadata.author,
+                        comic_info_author,
                         file_hash,
                         relative_path,
                         file_size,
@@ -314,8 +327,9 @@ pub async fn import_book(
                         comic.metadata.language,
                         comic.chapters.len() as i64,
                         comic.cover_path,
-                        serde_json::to_string(&comic.metadata).unwrap_or_default(),
+                        comic_meta_json.to_string(),
                         comic.metadata.reading_mode,
+                        comic_summary,
                     ],
                 )
                 ?;
