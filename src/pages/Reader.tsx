@@ -795,8 +795,9 @@ export function Reader() {
           chapterId={currentChapter.id}
         />
 
-        {/* Floating chapter navigation — edge hot-zone reveals the button */}
-        {chapterIndex > 0 && (
+        {/* Floating chapter navigation — edge hot-zone reveals the button.
+            In columns mode: turn page first; only change chapter at the edge. */}
+        {(chapterIndex > 0 || readingMode === "columns") && (
           <div
             className="absolute left-0 top-1/2 -translate-y-1/2 group pl-1.5 pr-3 py-8"
             style={{ zIndex: "var(--z-popover)" }}
@@ -808,14 +809,17 @@ export function Reader() {
                 border: "1px solid var(--border)",
                 boxShadow: "var(--shadow-md)",
               }}
-              onClick={() => loadChapter(chapters[chapterIndex - 1].id)}
-              title="上一章"
+              onClick={() => {
+                if (tryTurnPage(-1)) return;
+                if (chapterIndex > 0) loadChapter(chapters[chapterIndex - 1].id);
+              }}
+              title={readingMode === "columns" ? "上一页 / 上一章" : "上一章"}
             >
 <ChevronRight size={ 18 } strokeWidth={2} />
             </button>
           </div>
         )}
-        {chapterIndex < chapters.length - 1 && !showNotes && (
+        {(chapterIndex < chapters.length - 1 || readingMode === "columns") && !showNotes && (
           <div
             className="absolute right-0 top-1/2 -translate-y-1/2 group pr-1.5 pl-3 py-8"
             style={{ zIndex: "var(--z-popover)" }}
@@ -827,8 +831,11 @@ export function Reader() {
                 border: "1px solid var(--border)",
                 boxShadow: "var(--shadow-md)",
               }}
-              onClick={() => loadChapter(chapters[chapterIndex + 1].id)}
-              title="下一章"
+              onClick={() => {
+                if (tryTurnPage(1)) return;
+                if (chapterIndex < chapters.length - 1) loadChapter(chapters[chapterIndex + 1].id);
+              }}
+              title={readingMode === "columns" ? "下一页 / 下一章" : "下一章"}
             >
 <ChevronLeft size={ 18 } strokeWidth={2} />
             </button>

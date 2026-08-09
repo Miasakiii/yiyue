@@ -325,7 +325,24 @@ export function ComicReader() {
 
   const { closeBook } = useAppStore.getState();
   const goBack = () => {
-    if (currentBook) saveProgress(currentPage);
+    // Flush pending webtoon scroll debounce and sync page from live scroll
+    if (webtoonScrollTimer.current) {
+      clearTimeout(webtoonScrollTimer.current);
+      webtoonScrollTimer.current = undefined;
+    }
+    if (isWebtoon && webtoonRef.current && pages.length > 0 && currentBook) {
+      const el = webtoonRef.current;
+      const max = el.scrollHeight - el.clientHeight;
+      const ratio = max > 0 ? el.scrollTop / max : 0;
+      const pageIndex = Math.min(
+        pages.length - 1,
+        Math.max(0, Math.round(ratio * (pages.length - 1))),
+      );
+      setCurrentPage(pageIndex);
+      saveProgress(pageIndex);
+    } else if (currentBook) {
+      saveProgress(currentPage);
+    }
     closeBook();
   };
 
@@ -535,8 +552,8 @@ export function ComicReader() {
         )}
       </div>
 
-      {/* Page slider */}
-      {!isWebtoon && pages.length > 1 && (
+      {/* Page slider — also shown in webtoon so progress is visible/scrubable */}
+      {pages.length > 1 && (
         <footer className="px-5 py-2.5 flex items-center gap-4 flex-shrink-0"
           style={{ borderTop: "1px solid var(--border)", background: "var(--bg-elevated)" }}>
           <input type="range" className="flex-1 h-1 rounded-full appearance-none cursor-pointer"
@@ -545,7 +562,16 @@ export function ComicReader() {
               background: `linear-gradient(to right, var(--accent) ${progressPct}%, var(--bg-tertiary) ${progressPct}%)`,
             }}
             min={0} max={pages.length - 1} value={currentPage}
-            onChange={(e) => goToPage(Number(e.target.value))} />
+            onChange={(e) => {
+              const idx = Number(e.target.value);
+              if (isWebtoon && webtoonRef.current && pages.length > 1) {
+                const el = webtoonRef.current;
+                const max = el.scrollHeight - el.clientHeight;
+                const ratio = idx / (pages.length - 1);
+                el.scrollTop = ratio * max;
+              }
+              goToPage(idx);
+            }} />
           <span className="text-xs w-10 text-right tabular-nums" style={{ color: "var(--text-tertiary)" }}>{progressPct}%</span>
         </footer>
       )}
