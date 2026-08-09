@@ -213,3 +213,100 @@ fn split_by_size(paragraphs: &[(String, bool)], max_chars: usize) -> Vec<ParsedC
 
     chapters
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::io::Write;
+    use std::path::Path;
+
+    fn make_docx(path: &Path) {
+        let file = std::fs::File::create(path).unwrap();
+        let mut zip = zip::ZipWriter::new(file);
+        let def = zip::write::SimpleFileOptions::default();
+
+        zip.start_file("[Content_Types].xml", def).unwrap();
+        zip.write_all(
+            br#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
+  <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
+  <Default Extension="xml" ContentType="application/xml"/>
+  <Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>
+</Types>"#,
+        )
+        .unwrap();
+
+        zip.start_file("_rels/.rels", def).unwrap();
+        zip.write_all(
+            br#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/>
+</Relationships>"#,
+        )
+        .unwrap();
+
+        zip.start_file("word/_rels/document.xml.rels", def).unwrap();
+        zip.write_all(
+            br#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"/>"#,
+        )
+        .unwrap();
+
+        zip.start_file("word/document.xml", def).unwrap();
+        zip.write_all(
+            r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:body>
+    <w:p><w:pPr><w:pStyle w:val="Heading1"/></w:pPr><w:r><w:t>第一章 标题</w:t></w:r></w:p>
+    <w:p><w:r><w:t>正文内容</w:t></w:r></w:p>
+    <w:tbl>
+      <w:tr>
+        <w:tc><w:p><w:r><w:t>单元格A</w:t></w:r></w:p></w:tc>
+        <w:tc><w:p><w:r><w:t>单元格B</w:t></w:r></w:p></w:tc>
+      </w:tr>
+    </w:tbl>
+  </w:body>
+</w:document>"#
+            .as_bytes(),
+        )
+        .unwrap();
+        zip.finish().unwrap();
+    }
+
+    #[test]
+    fn parse_detects_heading_and_table() {
+        let dir = std::env::temp_dir().join(format!("yiyue-docx-test-{}", uuid::Uuid::new_v4()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("book.docx");
+        make_docx(&path);
+
+        let doc = super::parse(
+            &path,
+            &ParseOptions { encoding: None, chapter_pattern: None },
+        )
+        .expect("最小 DOCX 应能解析");
+
+        // 标题样式段落应识别为章节标题
+        let chapter_titles: Vec<&str> = doc
+            .chapters
+            .iter()
+            .map(|c| c.title.as_str())
+            .collect();
+        assert!(
+            chapter_titles.iter().any(|t| t.contains("第一章")),
+            "Heading1 段落应成为章节标题，实际: {:?}",
+            chapter_titles
+        );
+
+        // 表格单元格文本应被提取进正文
+        let all_text: String = doc
+            .chapters
+            .iter()
+            .flat_map(|c| c.content.chars())
+            .collect();
+        assert!(all_text.contains("单元格A"), "表格单元格 A 应被提取");
+        assert!(all_text.contains("单元格B"), "表格单元格 B 应被提取");
+
+        std::fs::remove_dir_all(&dir).ok();
+    }
+}

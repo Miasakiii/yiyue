@@ -154,3 +154,76 @@ fn extract_title_from_html(html: &str) -> Option<String> {
     }
     None
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::io::Write;
+
+    /// 构造最小合法 EPUB（mimetype stored + container + opf + 两章 xhtml）
+    fn make_epub(path: &Path) {
+        let file = std::fs::File::create(path).unwrap();
+        let mut zip = zip::ZipWriter::new(file);
+        let def = zip::write::SimpleFileOptions::default();
+        let stored = def.compression_method(zip::CompressionMethod::Stored);
+
+        zip.start_file("mimetype", stored).unwrap();
+        zip.write_all(b"application/epub+zip").unwrap();
+
+        zip.start_file("META-INF/container.xml", def).unwrap();
+        zip.write_all(
+            br#"<?xml version="1.0"?>
+<container version="1.0" xmlns="urn:oasis:names:tc:opendocument:xmlns:container">
+  <rootfiles><rootfile full-path="OEBPS/content.opf" media-type="application/oebps-package+xml"/></rootfiles>
+</container>"#,
+        )
+        .unwrap();
+
+        zip.start_file("OEBPS/content.opf", def).unwrap();
+        zip.write_all(
+            r#"<?xml version="1.0"?>
+<package xmlns="http://www.idpf.org/2007/opf" version="2.0" unique-identifier="BookId">
+  <metadata xmlns:dc="http://purl.org/dc/elements/1.1/">
+    <dc:title>测试电子书</dc:title>
+    <dc:creator>作者甲</dc:creator>
+    <dc:language>zh</dc:language>
+  </metadata>
+  <manifest>
+    <item id="ch1" href="ch1.xhtml" media-type="application/xhtml+xml"/>
+    <item id="ch2" href="ch2.xhtml" media-type="application/xhtml+xml"/>
+  </manifest>
+  <spine><itemref idref="ch1"/><itemref idref="ch2"/></spine>
+</package>"#
+            .as_bytes(),
+        )
+        .unwrap();
+
+        zip.start_file("OEBPS/ch1.xhtml", def).unwrap();
+        zip.write_all("<html><body><h1>第一章</h1><p>第一段内容。</p></body></html>".as_bytes())
+            .unwrap();
+        zip.start_file("OEBPS/ch2.xhtml", def).unwrap();
+        zip.write_all("<html><body><h1>第二章</h1><p>第二段内容。</p></body></html>".as_bytes())
+            .unwrap();
+        zip.finish().unwrap();
+    }
+
+    #[test]
+    fn parse_extracts_metadata_and_chapters() {
+        let dir = std::env::temp_dir().join(format!("yiyue-epub-test-{}", uuid::Uuid::new_v4()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("book.epub");
+        make_epub(&path);
+
+        let doc = super::parse(
+            &path,
+            &ParseOptions { encoding: None, chapter_pattern: None },
+        )
+        .expect("最小 EPUB 应能解析");
+        assert_eq!(doc.metadata.title, "测试电子书");
+        assert_eq!(doc.metadata.author.as_deref(), Some("作者甲"));
+        assert_eq!(doc.metadata.total_chapters, 2);
+        assert!(doc.chapters[0].content.contains("第一段内容"));
+
+        std::fs::remove_dir_all(&dir).ok();
+    }
+}

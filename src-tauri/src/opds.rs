@@ -574,3 +574,39 @@ fn handle_upload(request: &mut Request) -> AppResult<Option<String>> {
 
     Ok(None)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use rusqlite::params;
+
+    #[test]
+    fn build_feed_contains_book_entries() {
+        let conn = rusqlite::Connection::open_in_memory().unwrap();
+        crate::db::schema::initialize(&conn).unwrap();
+        conn.execute(
+            "INSERT INTO books (id, title, author, file_hash, file_path, file_size, format)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+            params!["book-1", "测试书籍", "作者甲", "hash1", "/x/y.txt", 100, "txt"],
+        )
+        .unwrap();
+
+        let feed = build_opds_feed(&conn, "http://localhost:8080").unwrap();
+        assert!(feed.contains("<title>测试书籍</title>"), "feed 应包含书名");
+        assert!(feed.contains("作者甲"), "feed 应包含作者");
+        assert!(
+            feed.contains("http://localhost:8080/books/book-1"),
+            "feed 应包含下载链接"
+        );
+        assert!(feed.contains("<entry>"), "feed 应包含 entry");
+    }
+
+    #[test]
+    fn build_feed_empty_library_still_valid() {
+        let conn = rusqlite::Connection::open_in_memory().unwrap();
+        crate::db::schema::initialize(&conn).unwrap();
+        let feed = build_opds_feed(&conn, "http://localhost:8080").unwrap();
+        assert!(feed.contains("<feed"), "空书库也应输出合法 feed");
+        assert!(!feed.contains("<entry>"), "空书库不应有 entry");
+    }
+}

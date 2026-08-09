@@ -281,4 +281,15 @@ mod tests {
         let path = Path::new("/some/path/我的小说.txt");
         assert_eq!(title_from_path(path), "我的小说");
     }
+
+    #[test]
+    fn test_decode_text_gbk() {
+        // GBK 编码的中文文本应被正确检测并解码（TEST_CHECKLIST 1 导入-GBK 编码）
+        let (gbk_bytes, _, _) = encoding_rs::GBK.encode("第一章 测试中文内容");
+        let enc = detect_encoding(&gbk_bytes);
+        assert_eq!(enc, encoding_rs::GBK, "GBK 应被检测为 GBK");
+        let text = decode_text(&gbk_bytes, None).unwrap();
+        assert!(text.contains("测试中文内容"));
+    }
+
 }

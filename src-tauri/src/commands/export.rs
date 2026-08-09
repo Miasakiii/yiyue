@@ -265,3 +265,45 @@ pub fn get_export_filename(
 
     Ok(format!("{}_{}.{}", book_name, date, ext))
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn sample() -> Vec<ExportAnnotation> {
+        vec![ExportAnnotation {
+            book_title: "测试书籍".to_string(),
+            chapter_title: Some("第一章".to_string()),
+            selected_text: Some("选中的文字".to_string()),
+            content: Some("我的笔记内容".to_string()),
+            color: "yellow".to_string(),
+            annotation_type: "highlight".to_string(),
+            tags: None,
+            created_at: "2026-08-09 12:00".to_string(),
+        }]
+    }
+
+    #[test]
+    fn export_markdown_contains_fields() {
+        let md = export_markdown(&sample());
+        assert!(md.contains("测试书籍"));
+        assert!(md.contains("选中的文字"));
+        assert!(md.contains("我的笔记内容"));
+    }
+
+    #[test]
+    fn export_html_contains_fields() {
+        let html = export_html(&sample());
+        assert!(html.contains("<h2"));
+        assert!(html.contains("测试书籍"));
+        assert!(html.contains("我的笔记内容"));
+    }
+
+    #[test]
+    fn export_json_is_valid_json() {
+        let json = export_json(&sample());
+        let parsed: serde_json::Value = serde_json::from_str(&json).expect("JSON 必须可解析");
+        assert!(parsed.is_array());
+        assert_eq!(parsed[0]["book_title"], "测试书籍");
+    }
+}

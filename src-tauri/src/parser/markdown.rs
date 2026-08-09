@@ -131,4 +131,36 @@ mod tests {
         assert!(html.contains("<h1>"));
         assert!(html.contains("<strong>"));
     }
+
+    #[test]
+    fn test_parse_splits_h1_chapters() {
+        // TEST_CHECKLIST 1 Markdown-按 # 标题切分章节
+        let dir = std::env::temp_dir().join(format!("yiyue-md-test-{}", uuid::Uuid::new_v4()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("book.md");
+        std::fs::write(
+            &path,
+            "# 第一章
+
+这是第一章内容。
+
+# 第二章
+
+这是第二章内容。
+",
+        )
+        .unwrap();
+        let doc = super::parse(
+            &path,
+            &ParseOptions { encoding: None, chapter_pattern: None },
+        )
+        .unwrap();
+        assert_eq!(doc.metadata.total_chapters, 2);
+        assert_eq!(doc.chapters[0].title, "第一章");
+        assert!(doc.chapters[0].content.contains("第一章内容"));
+        assert_eq!(doc.chapters[1].title, "第二章");
+        assert!(doc.chapters[1].content.contains("第二章内容"));
+        std::fs::remove_dir_all(&dir).ok();
+    }
+
 }
