@@ -149,6 +149,7 @@ CI 门禁：`.github/workflows/ci.yml` 在 push/PR 时按变更区域运行前�
 - rollup 原生模块缺失问题已根治：运行时已钉住（`package.json` 的 `packageManager`/`engines` + `src-tauri/rust-toolchain.toml`），全新 `pnpm install` 无需 `CI=true` 等环境变量变通即可完成，vitest 正常运行
 - 前端测试位于各 `__tests__/` 目录：`src/__tests__/regression.test.ts`（搜索 sanitize、阅读预设、导入进度）、`src/__tests__/security-baseline.test.ts`（安全基线比对）、`src/types/__tests__/index.test.ts`、`src/stores/__tests__/app.test.ts`（含 applyRulesToBook 的 contentVersion 断言）、`src/hooks/__tests__/useReaderKeyboard.test.tsx`（输入框守卫）；文件清单与用例数以 `pnpm test`（仓库根目录）输出为准
 - Rust 测试覆盖 schema / search / parser / rules 模块，在 `src-tauri/` 目录运行 `cargo test` 验证；用例数以实际运行为准（历史快照见 `STATUS.md`）
+- 依赖安全：`pnpm audit` 与 `cargo audit`（`src-tauri/audit.toml` 忽略 GTK3 栈）应保持 0 漏洞；升级依赖后先跑 gate
 - `src-tauri/tests/error_ratchet.rs` 为错误处理迁移棘轮：旧式 `Result<T, String>` 数量上升即失败，下降时提示用 `UPDATE_ERROR_RATCHET=1 cargo test --test error_ratchet` 下调基线（`tests/error_ratchet_baseline.json` 随代码提交）
 
 ## 文档参考
