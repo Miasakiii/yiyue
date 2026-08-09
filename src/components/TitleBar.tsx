@@ -35,11 +35,14 @@ export function TitleBar() {
       {/* Left: app identity (also part of the drag region) */}
       <div data-tauri-drag-region className="flex items-center gap-2 px-3 flex-1 min-w-0">
         <span
-          className="w-4 h-4 rounded flex items-center justify-center text-[9px] font-bold flex-shrink-0"
-          // eslint-disable-next-line no-restricted-syntax -- accent 底上的白色前景，各主题通用，暂无 --text-on-accent 令牌
-          style={{ background: "var(--accent)", color: "#fff" }}
+          className="w-4 h-4 rounded flex items-center justify-center flex-shrink-0"
+          style={{ background: "var(--accent)" }}
+          title="一页"
         >
-          页
+          <svg width="11" height="11" viewBox="0 0 16 16" fill="none">
+            <rect x="1.5" y="2" width="13" height="12" rx="2" fill="#fff" />
+            <path d="M4.5 5.5h7M4.5 8h7M4.5 10.5h4" stroke="var(--accent)" strokeWidth="1.2" strokeLinecap="round" />
+          </svg>
         </span>
         <span className="text-xs truncate" style={{ color: "var(--text-tertiary)" }}>
           一页
