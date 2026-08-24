@@ -15,6 +15,12 @@ import { ReaderContent } from "./reader/ReaderContent";
 import type { SaveReadingProfile, Bookmark } from "../types";
 
 import { FONT_FAMILIES, CONTENT_WIDTH_PRESETS, PRESETS, type Preset } from "./reader/constants";
+import {
+  scrollContentToJump,
+  stashPendingChapterJump,
+  takePendingChapterJump,
+  type ChapterJumpTarget,
+} from "./reader/jump";
 
 /* ---------- Component ---------- */
 export function Reader() {
@@ -442,7 +448,12 @@ export function Reader() {
   const handleAddBookmark = useCallback(() => {
     if (!currentBook || !currentChapter) return;
     const chapterIdx = chapters.findIndex((c) => c.id === currentChapter.id);
-    const scrollOffset = progress?.scroll_offset ?? 0;
+    // Prefer live viewport over debounced store progress (avoids stale offset)
+    let scrollOffset = progress?.scroll_offset ?? 0;
+    if (contentRef.current) {
+      const { pos, max } = scrollAxis(contentRef.current);
+      scrollOffset = max > 0 ? pos / max : 0;
+    }
     const chapterTitle = currentChapter.title || `第 ${chapterIdx + 1} 章`;
     const title = `${chapterIdx + 1}. ${chapterTitle} · ${Math.round(scrollOffset * 100)}%`;
     createBookmark({
@@ -456,20 +467,42 @@ export function Reader() {
         setShowSidebar(true);
       })
       .catch(() => {});
-  }, [currentBook, currentChapter, chapters, progress, createBookmark]);
+  }, [currentBook, currentChapter, chapters, progress, createBookmark, scrollAxis]);
 
-  const handleJumpToBookmark = (bookmark: Bookmark) => {
+  const handleJumpToBookmark = useCallback((bookmark: Bookmark) => {
     if (!bookmark.chapter_id) return;
     loadChapter(bookmark.chapter_id).then(() => {
       setTimeout(() => {
         if (!contentRef.current) return;
         const el = contentRef.current;
-        const scrollHeight = el.scrollHeight - el.clientHeight;
-        el.scrollTop = bookmark.scroll_offset * scrollHeight;
+        const { max } = scrollAxis(el);
+        if (readingMode === "columns") {
+          el.scrollLeft = bookmark.scroll_offset * max;
+        } else {
+          el.scrollTop = bookmark.scroll_offset * max;
+        }
         setShowSidebar(false);
       }, 150);
     });
-  };
+  }, [loadChapter, readingMode, scrollAxis]);
+
+  const tryTurnPage = useCallback((dir: 1 | -1) => {
+    if (readingMode !== "columns" || !contentRef.current) return false;
+    const el = contentRef.current;
+    const pageWidth = Math.max(el.clientWidth, 1);
+    const max = el.scrollWidth - el.clientWidth;
+    if (max <= 2) return false;
+    const epsilon = 4;
+    if (dir > 0 && el.scrollLeft < max - epsilon) {
+      el.scrollTo({ left: Math.min(el.scrollLeft + pageWidth, max), behavior: "smooth" });
+      return true;
+    }
+    if (dir < 0 && el.scrollLeft > epsilon) {
+      el.scrollTo({ left: Math.max(el.scrollLeft - pageWidth, 0), behavior: "smooth" });
+      return true;
+    }
+    return false;
+  }, [readingMode]);
 
   /* ---- Keyboard navigation ---- */
   useReaderKeyboard({
@@ -477,13 +510,25 @@ export function Reader() {
     setShowSidebar, setShowNotes, setSettingsOpen,
     settingsOpen, showNotes, showSidebar,
     toggleImmersive: () => setImmersive((v) => !v), handleAddBookmark, currentBook,
+    tryTurnPage,
   });
 
-  /* ---- Restore scroll position ---- */
+  /* ---- Restore scroll / pending search·note jump ---- */
   useEffect(() => {
-    if (!content || !progress || !currentChapter || !contentRef.current) return;
+    if (!content || !currentChapter || !contentRef.current) return;
+
+    const pending = takePendingChapterJump(currentChapter.id);
+    if (pending) {
+      const ok = scrollContentToJump(contentRef.current, {
+        matchedText: pending.matchedText,
+        charOffset: pending.charOffset,
+        columns: readingMode === "columns",
+      });
+      if (ok) return;
+    }
+
     // Only restore scroll if progress matches the current chapter
-    if (progress.chapter_id !== currentChapter.id) return;
+    if (!progress || progress.chapter_id !== currentChapter.id) return;
     const el = contentRef.current;
     const { max } = scrollAxis(el);
     if (readingMode === "columns") el.scrollLeft = progress.scroll_offset * max;
@@ -500,26 +545,25 @@ export function Reader() {
     useAppStore.getState().closeBook();
     navigate("/");
   };
-  const handleJumpTo = (chapterId: string, offset: number) => {
-    loadChapter(chapterId).then(() => {
-      // After content loads, try to scroll to the annotation offset
-      // Use a small delay to ensure DOM is ready
-      setTimeout(() => {
+
+  const handleJumpTo = useCallback((target: ChapterJumpTarget) => {
+    setShowNotes(false);
+    // Same chapter already on screen — jump immediately (prefer matchedText).
+    if (currentChapter?.id === target.chapterId && content && contentRef.current) {
+      requestAnimationFrame(() => {
         if (!contentRef.current) return;
-        const el = contentRef.current;
-        const article = el.querySelector("article");
-        if (!article) return;
-        // Approximate: offset is char index, estimate position by ratio
-        const totalChars = article.textContent?.length || 1;
-        const ratio = Math.min(offset / totalChars, 1);
-        if (readingMode === "columns") {
-          el.scrollLeft = ratio * (el.scrollWidth - el.clientWidth);
-        } else {
-          el.scrollTop = ratio * (el.scrollHeight - el.clientHeight);
-        }
-      }, 100);
-    });
-  };
+        scrollContentToJump(contentRef.current, {
+          matchedText: target.matchedText,
+          charOffset: target.charOffset,
+          columns: readingMode === "columns",
+        });
+      });
+      return;
+    }
+    // Cross-chapter: stash for the content-load effect, then switch chapter.
+    stashPendingChapterJump(target);
+    loadChapter(target.chapterId);
+  }, [content, currentChapter?.id, loadChapter, readingMode]);
 
   /* ---- Early returns ---- */
   if (!currentBook) {
@@ -738,8 +782,9 @@ export function Reader() {
           chapterId={currentChapter.id}
         />
 
-        {/* Floating chapter navigation — edge hot-zone reveals the button */}
-        {chapterIndex > 0 && (
+        {/* Floating chapter navigation — edge hot-zone reveals the button.
+            In columns mode: turn page first; only change chapter at the edge. */}
+        {(chapterIndex > 0 || readingMode === "columns") && (
           <div
             className="absolute left-0 top-1/2 -translate-y-1/2 group pl-1.5 pr-3 py-8"
             style={{ zIndex: "var(--z-popover)" }}
@@ -751,14 +796,17 @@ export function Reader() {
                 border: "1px solid var(--border)",
                 boxShadow: "var(--shadow-md)",
               }}
-              onClick={() => loadChapter(chapters[chapterIndex - 1].id)}
-              title="上一章"
+              onClick={() => {
+                if (tryTurnPage(-1)) return;
+                if (chapterIndex > 0) loadChapter(chapters[chapterIndex - 1].id);
+              }}
+              title={readingMode === "columns" ? "上一页 / 上一章" : "上一章"}
             >
 <ChevronRight size={ 18 } strokeWidth={2} />
             </button>
           </div>
         )}
-        {chapterIndex < chapters.length - 1 && !showNotes && (
+        {(chapterIndex < chapters.length - 1 || readingMode === "columns") && !showNotes && (
           <div
             className="absolute right-0 top-1/2 -translate-y-1/2 group pr-1.5 pl-3 py-8"
             style={{ zIndex: "var(--z-popover)" }}
@@ -770,8 +818,11 @@ export function Reader() {
                 border: "1px solid var(--border)",
                 boxShadow: "var(--shadow-md)",
               }}
-              onClick={() => loadChapter(chapters[chapterIndex + 1].id)}
-              title="下一章"
+              onClick={() => {
+                if (tryTurnPage(1)) return;
+                if (chapterIndex < chapters.length - 1) loadChapter(chapters[chapterIndex + 1].id);
+              }}
+              title={readingMode === "columns" ? "下一页 / 下一章" : "下一章"}
             >
 <ChevronLeft size={ 18 } strokeWidth={2} />
             </button>

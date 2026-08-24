@@ -51,9 +51,10 @@ export function BookCard({ book, viewMode }: BookCardProps) {
   const [bookGroups, setBookGroups] = useState<Group[]>([]);
   const [ctxTab, setCtxTab] = useState<"tags" | "groups">("tags");
   const ctxRef = useRef<HTMLDivElement>(null);
+  const cardRef = useRef<HTMLDivElement>(null);
   // Cover falls back to the format badge if the file can't be loaded
   const [coverError, setCoverError] = useState(false);
-  // Dedupe tag/group association fetches (mount + first right-click race)
+  // Dedupe tag/group association fetches (visible + first right-click race)
   const assocLoadedRef = useRef(false);
 
   const loadBookAssociations = useCallback(async (force = false) => {
@@ -67,9 +68,21 @@ export function BookCard({ book, viewMode }: BookCardProps) {
     setBookGroups(bg);
   }, [book.id, getBookTags, getBookGroups]);
 
-  // Load tag dots once when the card mounts, not only on right-click
+  // Lazy-load associations when the card scrolls into view (avoids N+1 burst on library open)
   useEffect(() => {
-    loadBookAssociations();
+    const el = cardRef.current;
+    if (!el) return;
+    const io = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((e) => e.isIntersecting)) {
+          loadBookAssociations();
+          io.disconnect();
+        }
+      },
+      { rootMargin: "120px" },
+    );
+    io.observe(el);
+    return () => io.disconnect();
   }, [loadBookAssociations]);
 
   const handleContextMenu = useCallback((e: React.MouseEvent) => {
@@ -164,6 +177,7 @@ export function BookCard({ book, viewMode }: BookCardProps) {
     return (
       <>
         <div
+          ref={cardRef}
           className="flex items-center gap-4 px-4 py-3 rounded-xl cursor-pointer group card-hover"
           style={{
             background: "var(--bg-secondary)",
@@ -230,6 +244,7 @@ export function BookCard({ book, viewMode }: BookCardProps) {
   return (
     <>
       <div
+        ref={cardRef}
         className="flex flex-col rounded-xl overflow-hidden cursor-pointer group card-hover"
         style={{
           background: "var(--bg-elevated)",

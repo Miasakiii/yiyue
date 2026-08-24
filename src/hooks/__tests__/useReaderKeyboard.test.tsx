@@ -110,6 +110,60 @@ describe("useReaderKeyboard input guard", () => {
     expect(loadChapter).toHaveBeenCalledWith("ch3");
   });
 
+  it("turns in-chapter page via tryTurnPage before switching chapters", () => {
+    const tryTurnPage = vi.fn(() => true);
+    const loadChapter = vi.fn();
+    renderHook(() =>
+      useReaderKeyboard({
+        currentChapter: chapters[0],
+        chapters,
+        loadChapter,
+        setFontSize: vi.fn(),
+        setShowSidebar: vi.fn(),
+        setShowNotes: vi.fn(),
+        setSettingsOpen: vi.fn(),
+        settingsOpen: false,
+        showNotes: false,
+        showSidebar: false,
+        toggleImmersive: vi.fn(),
+        handleAddBookmark: vi.fn(),
+        currentBook: null,
+        tryTurnPage,
+      }),
+    );
+
+    fireEvent.keyDown(document.body, { key: "ArrowRight" });
+    expect(tryTurnPage).toHaveBeenCalledWith(1);
+    expect(loadChapter).not.toHaveBeenCalled();
+  });
+
+  it("falls through to next chapter when tryTurnPage returns false", () => {
+    const tryTurnPage = vi.fn(() => false);
+    const loadChapter = vi.fn();
+    renderHook(() =>
+      useReaderKeyboard({
+        currentChapter: chapters[0],
+        chapters,
+        loadChapter,
+        setFontSize: vi.fn(),
+        setShowSidebar: vi.fn(),
+        setShowNotes: vi.fn(),
+        setSettingsOpen: vi.fn(),
+        settingsOpen: false,
+        showNotes: false,
+        showSidebar: false,
+        toggleImmersive: vi.fn(),
+        handleAddBookmark: vi.fn(),
+        currentBook: null,
+        tryTurnPage,
+      }),
+    );
+
+    fireEvent.keyDown(document.body, { key: "ArrowRight" });
+    expect(tryTurnPage).toHaveBeenCalledWith(1);
+    expect(loadChapter).toHaveBeenCalledWith("ch2");
+  });
+
   it("does not preventDefault on ArrowRight at the last chapter (dead-key passthrough)", () => {
     setup(chapters[2]);
     // fireEvent returns false only when preventDefault was called

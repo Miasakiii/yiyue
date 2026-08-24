@@ -157,7 +157,7 @@ export function Library() {
               return SUPPORTED_EXTENSIONS.includes(ext);
             });
             if (paths.length === 0) {
-              setImportError("没有支持的文件格式（TXT/EPUB/PDF/MD/CBZ/DOCX）");
+              setImportError("没有支持的文件格式（TXT/EPUB/PDF/MD/CBZ/CBR/DOCX）");
               return;
             }
             await importPaths(paths);
@@ -333,7 +333,7 @@ export function Library() {
 <Upload size={ 48 } strokeWidth={1.5} />
             <div className="text-base font-medium">释放鼠标以导入</div>
             <div className="text-xs" style={{ color: "var(--text-tertiary)" }}>
-              支持 TXT / EPUB / PDF / MD / CBZ / DOCX
+              支持 TXT / EPUB / PDF / MD / CBZ / CBR / DOCX
             </div>
           </div>
         </div>
@@ -754,7 +754,7 @@ icon={<Star size={16} strokeWidth={2} />}
               </div>
               {!hasActiveFilter && (
                 <div className="flex gap-2 mt-1">
-                  {["TXT", "EPUB", "PDF", "MD", "CBZ", "DOCX"].map((fmt) => (
+                  {["TXT", "EPUB", "PDF", "MD", "CBZ", "CBR", "DOCX"].map((fmt) => (
                     <span
                       key={fmt}
                       className="text-xs px-2.5 py-1 rounded"
